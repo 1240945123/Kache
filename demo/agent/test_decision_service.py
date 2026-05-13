@@ -53,11 +53,11 @@ def _status(**overrides):
     return base
 
 
-def _cargo(cargo_id="C1", category="普通货物", cargo_name=None, price=500.0):
+def _cargo(cargo_id="C1", category="普通货物", cargo_name=None, price=500.0, remove_time="2026-03-01 23:59:59"):
     cargo = {
         "cargo_id": cargo_id,
         "category": category,
-        "remove_time": "2026-03-01 23:59:59",
+        "remove_time": remove_time,
         "price": price,
         "cost_time_minutes": 100,
         "load_time": None,
@@ -142,15 +142,45 @@ class DecisionServiceTest(unittest.TestCase):
 
         self.assertEqual(action["action"], "wait")
 
-    def test_known_monthly_off_rule_does_not_block_safe_candidate(self):
+    def test_required_cargo_is_found_before_top_candidate_truncation(self):
+        required = "\u6307\u5b9a\u719f\u8d27\u6e90\u7f16\u53f7240646"
+        expensive = [_cargo(cargo_id=f"TOP{i}", price=1000.0 + i) for i in range(12)]
+        api = FakeApi(
+            status=_status(simulation_progress_minutes=8 * 60, preferences=[required]),
+            cargo_items=expensive + [_cargo(cargo_id="240646", price=300.0)],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action, {"action": "take_order", "params": {"cargo_id": "240646"}})
+
+    def test_monthly_deadhead_limit_filters_when_budget_is_used(self):
+        api = FakeApi(
+            status=_status(
+                simulation_progress_minutes=8 * 60,
+                preferences=["一个月空驶赶路里程总和不得超过100公里；仅对超出部分按公里计罚。"],
+            ),
+            history={
+                "records": [
+                    {"action": {"action": "take_order"}, "result": {"accepted": True, "pickup_deadhead_km": 99.9}}
+                ]
+            },
+            cargo_items=[_cargo(cargo_id="FAR")],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action["action"], "wait")
+
+    def test_known_monthly_off_rule_does_not_block_after_required_days_satisfied(self):
         monthly_off = (
             "\u81ea\u7136\u6708\u5185\u81f3\u5c11\u8981\u67092\u4e2a"
             "\u6574\u5929\u65e2\u4e0d\u63a5\u5355\u4e5f\u4e0d"
             "\u7a7a\u8f66\u4e71\u8dd1\u3002"
         )
         api = FakeApi(
-            status=_status(simulation_progress_minutes=8 * 60, preferences=[monthly_off]),
-            cargo_items=[_cargo()],
+            status=_status(simulation_progress_minutes=2 * 24 * 60 + 8 * 60, preferences=[monthly_off]),
+            cargo_items=[_cargo(remove_time="2026-03-30 23:59:59")],
         )
 
         action = ModelDecisionService(api).decide("DXXX")

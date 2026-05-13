@@ -134,6 +134,193 @@ class PlannerTest(unittest.TestCase):
         self.assertEqual(intent.intent_type, "visit_target")
         self.assertEqual(intent.action, "reposition")
 
+    def test_monthly_visit_waits_once_when_already_at_target_on_new_day(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 1440 + 60,
+                "current_lat": 31.2304,
+                "current_lng": 121.4737,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "reposition", "params": {"latitude": 31.2304, "longitude": 121.4737}},
+                        "position_after": {"lat": 31.2304, "lng": 121.4737},
+                        "simulation_end_time": "2026-03-01 05:00",
+                    }
+                ]
+            },
+        )
+        rules = [_rule(RuleType.MONTHLY_VISIT_DAYS, {"required_days": 2, "lat": 31.2304, "lng": 121.4737, "radius_km": 1.0})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "visit_target_wait")
+        self.assertEqual(intent.action, "wait")
+
+    def test_monthly_visit_does_not_repeat_reposition_after_current_day_credit(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 1440 + 120,
+                "current_lat": 31.2304,
+                "current_lng": 121.4737,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "wait", "params": {"duration_minutes": 30}},
+                        "position_after": {"lat": 31.2304, "lng": 121.4737},
+                        "simulation_end_time": "2026-03-02 01:30",
+                    }
+                ]
+            },
+        )
+        rules = [_rule(RuleType.MONTHLY_VISIT_DAYS, {"required_days": 5, "lat": 31.2304, "lng": 121.4737, "radius_km": 1.0})]
+
+        self.assertIsNone(choose_required_intent(state, rules))
+
+    def test_monthly_no_order_day_waits_at_start_of_month(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 8 * 60,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [_rule(RuleType.MONTHLY_NO_ORDER_DAYS, {"required_days": 1})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "monthly_no_order_day")
+        self.assertEqual(intent.action, "wait")
+
+    def test_daily_order_limit_waits_after_limit_reached(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 12 * 60,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 2,
+            },
+            {
+                "records": [
+                    {"action": {"action": "take_order"}, "result": {"accepted": True}, "simulation_end_time": "2026-03-01 09:00"},
+                    {"action": {"action": "take_order"}, "result": {"accepted": True}, "simulation_end_time": "2026-03-01 11:00"},
+                ]
+            },
+        )
+        rules = [_rule(RuleType.DAILY_ORDER_LIMIT, {"max_orders": 2})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "daily_order_limit")
+        self.assertEqual(intent.action, "wait")
+
+    def test_first_order_deadline_waits_after_missing_deadline(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 13 * 60,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [_rule(RuleType.FIRST_ORDER_DEADLINE, {"deadline_minute": 12 * 60})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "first_order_deadline")
+        self.assertEqual(intent.action, "wait")
+
+    def test_home_deadline_repositions_home_after_deadline(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 23 * 60 + 10,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [_rule(RuleType.HOME_DEADLINE, {"deadline_minute": 23 * 60, "lat": 23.12, "lng": 113.28, "radius_km": 1.0})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "home_deadline")
+        self.assertEqual(intent.action, "reposition")
+        self.assertEqual(intent.params, {"latitude": 23.12, "longitude": 113.28})
+
+    def test_sequence_task_repositions_to_first_step_before_deadline(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 9 * 24 * 60 + 10 * 60,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [
+            _rule(
+                RuleType.SEQUENCE_TASK,
+                {
+                    "steps": [
+                        {"action": "pickup", "lat": 23.21, "lng": 113.37, "wait_minutes": 10},
+                        {"action": "return_home", "lat": 23.19, "lng": 113.36},
+                    ],
+                    "deadline": "2026-03-10 22:00:00",
+                    "stay_until": "2026-03-13 22:00:00",
+                },
+            )
+        ]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "sequence_pickup")
+        self.assertEqual(intent.action, "reposition")
+        self.assertEqual(intent.params, {"latitude": 23.21, "longitude": 113.37})
+
+    def test_sequence_task_stays_home_during_stay_window(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 10 * 24 * 60 + 23 * 60,
+                "current_lat": 23.19,
+                "current_lng": 113.36,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [
+            _rule(
+                RuleType.SEQUENCE_TASK,
+                {
+                    "steps": [
+                        {"action": "pickup", "lat": 23.21, "lng": 113.37, "wait_minutes": 10},
+                        {"action": "return_home", "lat": 23.19, "lng": 113.36},
+                    ],
+                    "deadline": "2026-03-10 22:00:00",
+                    "stay_until": "2026-03-13 22:00:00",
+                },
+            )
+        ]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "sequence_stay_home")
+        self.assertEqual(intent.action, "wait")
+
     def test_current_day_rest_credit_clips_wait_that_crossed_midnight(self):
         state = build_planner_state(
             {

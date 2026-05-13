@@ -68,6 +68,23 @@ class PolicyGuardTest(unittest.TestCase):
 
         self.assertFalse(is_candidate_allowed(candidate, rules, cargo_by_id={"C1": {"category": "钢材"}}))
 
+    def test_bounding_box_removes_candidate_ending_outside_box(self):
+        candidate = _candidate(end={"lat": 22.8, "lng": 114.8})
+        rules = [
+            _rule(
+                RuleType.BOUNDING_BOX,
+                value={"min_lat": 22.42, "max_lat": 22.89, "min_lng": 113.74, "max_lng": 114.66},
+            )
+        ]
+
+        self.assertFalse(is_candidate_allowed(candidate, rules, cargo_by_id={"C1": {"category": "test"}}))
+
+    def test_forbidden_zone_removes_candidate_inside_zone(self):
+        candidate = _candidate(start={"lat": 23.30, "lng": 113.52})
+        rules = [_rule(RuleType.FORBIDDEN_ZONE, value={"lat": 23.30, "lng": 113.52, "radius_km": 20.0})]
+
+        self.assertFalse(is_candidate_allowed(candidate, rules, cargo_by_id={"C1": {"category": "test"}}))
+
     def test_no_drive_window_during_2305_returns_wait_action_duration_415(self):
         rules = [
             _rule(

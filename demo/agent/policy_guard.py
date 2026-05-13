@@ -4,10 +4,10 @@ from typing import Any
 
 if __package__:
     from .preference_rules import PreferenceRule, RuleStrength, RuleType
-    from .strategy_helpers import Candidate
+    from .strategy_helpers import Candidate, haversine_km
 else:
     from preference_rules import PreferenceRule, RuleStrength, RuleType
-    from strategy_helpers import Candidate
+    from strategy_helpers import Candidate, haversine_km
 
 DEFAULT_UNKNOWN_STRONG_WAIT_MINUTES = 30
 MINUTES_PER_DAY = 24 * 60
@@ -28,6 +28,28 @@ def _is_unknown_strong(rule: PreferenceRule) -> bool:
 
 def _current_day_minute(current_minute: int) -> int:
     return int(current_minute) % MINUTES_PER_DAY
+
+
+def _point_in_box(point: dict[str, Any], value: dict[str, Any]) -> bool:
+    try:
+        lat = float(point["lat"])
+        lng = float(point["lng"])
+        return (
+            float(value["min_lat"]) <= lat <= float(value["max_lat"])
+            and float(value["min_lng"]) <= lng <= float(value["max_lng"])
+        )
+    except (KeyError, TypeError, ValueError):
+        return True
+
+
+def _point_in_zone(point: dict[str, Any], value: dict[str, Any]) -> bool:
+    try:
+        return (
+            haversine_km(float(point["lat"]), float(point["lng"]), float(value["lat"]), float(value["lng"]))
+            <= float(value["radius_km"])
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
 def _remaining_window_minutes(current_minute: int, rule: PreferenceRule) -> int | None:
@@ -91,6 +113,12 @@ def is_candidate_allowed(
                     return False
             except (KeyError, TypeError, ValueError):
                 continue
+        elif rule.rule_type == RuleType.BOUNDING_BOX:
+            if not _point_in_box(candidate.start, rule.value) or not _point_in_box(candidate.end, rule.value):
+                return False
+        elif rule.rule_type == RuleType.FORBIDDEN_ZONE:
+            if _point_in_zone(candidate.start, rule.value) or _point_in_zone(candidate.end, rule.value):
+                return False
     return True
 
 

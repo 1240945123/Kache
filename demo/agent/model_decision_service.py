@@ -57,6 +57,7 @@ class ModelDecisionService:
             self._logger.info("decision required_wait driver_id=%s action=%s", driver_id, window_wait)
             return window_wait
 
+        history: dict[str, Any] | None = None
         history_step = self._history_step_for_planner(deterministic_rules)
         if history_step is not None:
             history = self._safe_history(driver_id, history_step)
@@ -89,11 +90,17 @@ class ModelDecisionService:
         if not isinstance(items, list):
             return fallback_wait_action()
 
-        candidates = filter_and_rank_candidates(items, status)
         cargo_by_id = self._cargo_by_id(items)
+        required_cargo_ids = self._required_cargo_ids(rules)
+        candidate_limit = len(items) if required_cargo_ids else 10
+        candidates = filter_and_rank_candidates(items, status, limit=candidate_limit)
         allowed_candidates = filter_candidates(candidates, rules, cargo_by_id=cargo_by_id)
-        allowed_candidates = self._apply_required_cargo(allowed_candidates, rules)
-        if not allowed_candidates and self._required_cargo_ids(rules):
+        if self._has_monthly_deadhead_limit(rules):
+            if history is None:
+                history = self._safe_history(driver_id, -1)
+            allowed_candidates = self._apply_monthly_deadhead_limit(allowed_candidates, rules, history)
+        allowed_candidates = self._apply_required_cargo(allowed_candidates, required_cargo_ids)
+        if not allowed_candidates and required_cargo_ids:
             action = fallback_wait_action()
             self._logger.info("decision required_cargo_missing driver_id=%s action=%s", driver_id, action)
             return action
@@ -116,10 +123,20 @@ class ModelDecisionService:
 
     def _history_step_for_planner(self, rules: list[PreferenceRule]) -> int | None:
         needs_daily_rest = False
+        history_rule_types = {
+            RuleType.DAILY_ORDER_LIMIT,
+            RuleType.FIRST_ORDER_DEADLINE,
+            RuleType.HOME_DEADLINE,
+            RuleType.MONTHLY_DEADHEAD_LIMIT,
+            RuleType.MONTHLY_NO_ORDER_DAYS,
+            RuleType.MONTHLY_OFF_DAYS,
+            RuleType.MONTHLY_VISIT_DAYS,
+            RuleType.SEQUENCE_TASK,
+        }
         for rule in rules:
             if rule.strength != RuleStrength.HARD:
                 continue
-            if rule.rule_type == RuleType.MONTHLY_VISIT_DAYS:
+            if rule.rule_type in history_rule_types:
                 return -1
             if rule.rule_type == RuleType.DAILY_REST:
                 needs_daily_rest = True
@@ -160,11 +177,49 @@ class ModelDecisionService:
                 cargo_ids.add(cargo_id)
         return cargo_ids
 
-    def _apply_required_cargo(self, candidates: list[Candidate], rules: list[PreferenceRule]) -> list[Candidate]:
-        required_cargo_ids = self._required_cargo_ids(rules)
+    def _apply_required_cargo(self, candidates: list[Candidate], required_cargo_ids: set[str]) -> list[Candidate]:
         if not required_cargo_ids:
             return candidates
         return [candidate for candidate in candidates if candidate.cargo_id in required_cargo_ids]
+
+    def _has_monthly_deadhead_limit(self, rules: list[PreferenceRule]) -> bool:
+        return any(rule.strength == RuleStrength.HARD and rule.rule_type == RuleType.MONTHLY_DEADHEAD_LIMIT for rule in rules)
+
+    def _monthly_deadhead_used_km(self, history: dict[str, Any]) -> float:
+        records = history.get("records", []) if isinstance(history, dict) else []
+        total = 0.0
+        if not isinstance(records, list):
+            return total
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            result = record.get("result")
+            if not isinstance(result, dict):
+                continue
+            try:
+                total += max(0.0, float(result.get("pickup_deadhead_km", 0.0) or 0.0))
+            except (TypeError, ValueError):
+                continue
+        return total
+
+    def _apply_monthly_deadhead_limit(
+        self,
+        candidates: list[Candidate],
+        rules: list[PreferenceRule],
+        history: dict[str, Any],
+    ) -> list[Candidate]:
+        limits: list[float] = []
+        for rule in rules:
+            if rule.strength != RuleStrength.HARD or rule.rule_type != RuleType.MONTHLY_DEADHEAD_LIMIT:
+                continue
+            try:
+                limits.append(float(rule.value["km"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+        if not limits:
+            return candidates
+        remaining_km = min(limits) - self._monthly_deadhead_used_km(history)
+        return [candidate for candidate in candidates if candidate.pickup_distance_km <= remaining_km]
 
     def _model_parse_preference(self, text: str) -> dict[str, Any]:
         payload = {
