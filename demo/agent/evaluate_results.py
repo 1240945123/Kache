@@ -68,8 +68,9 @@ def build_report(results_dir: Path, *, experiment_id: str) -> str:
     if isinstance(token_usage, dict):
         lines.append(f"- total_token_usage.total_tokens: {token_usage.get('total_tokens', '')}")
     if run_summary:
-        for key in ("simulate_time_seconds", "simulation_duration_days", "simulation_max_steps"):
-            lines.append(f"- {key}: {run_summary.get(key, '')}")
+        for key in ("simulate_time_seconds", "simulation_duration_days", "simulation_max_steps", "completed_steps"):
+            if key in run_summary:
+                lines.append(f"- {key}: {run_summary.get(key, '')}")
 
     lines.extend(
         [

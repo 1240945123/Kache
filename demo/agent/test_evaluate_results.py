@@ -44,6 +44,7 @@ class EvaluateResultsTest(unittest.TestCase):
                         "simulate_time_seconds": 3.5,
                         "simulation_duration_days": 30,
                         "simulation_max_steps": 20000,
+                        "completed_steps": 42,
                     }
                 ),
                 encoding="utf-8",
@@ -62,6 +63,7 @@ class EvaluateResultsTest(unittest.TestCase):
 
         self.assertIn("# Experiment unit-test", report)
         self.assertIn("total_net_income_all_drivers", report)
+        self.assertIn("completed_steps", report)
         self.assertIn("| D001 | 200.0 | 50.0 | 20.0 | 130.0 |", report)
         self.assertIn("take_order=1", report)
 
