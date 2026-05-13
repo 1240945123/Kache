@@ -165,6 +165,66 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(rules[0].value, {"location": "home", "reason": "sms_notice"})
         self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
 
+    def test_model_fallback_accepts_list_of_rule_dicts(self):
+        def fake_model_parser(text):
+            return [
+                {
+                    "rule_type": "stay_window",
+                    "strength": "hard",
+                    "value": {"location": "home"},
+                },
+                {
+                    "rule_type": "home_deadline",
+                    "strength": "hard",
+                    "value": {"deadline_minute": 1380, "lat": 23.12, "lng": 113.28, "radius_km": 1.0},
+                },
+            ]
+
+        rules = parse_preferences_with_fallback(["必须按短信通知留在家中。"], fake_model_parser, max_model_calls=1)
+
+        self.assertEqual([rule.rule_type for rule in rules], [RuleType.STAY_WINDOW, RuleType.HOME_DEADLINE])
+        self.assertEqual([rule.strength for rule in rules], [RuleStrength.HARD, RuleStrength.HARD])
+        self.assertEqual(rules[0].value, {"location": "home"})
+        self.assertEqual(
+            rules[1].value,
+            {"deadline_minute": 1380, "lat": 23.12, "lng": 113.28, "radius_km": 1.0},
+        )
+        self.assertEqual([rule.source_text for rule in rules], ["必须按短信通知留在家中。"] * 2)
+
+    def test_model_fallback_accepts_rules_wrapper_dict(self):
+        def fake_model_parser(text):
+            return {
+                "rules": [
+                    {
+                        "rule_type": "stay_window",
+                        "strength": "hard",
+                        "value": {"location": "home", "reason": "sms_notice"},
+                    }
+                ]
+            }
+
+        rules = parse_preferences_with_fallback(["必须按短信通知留在家中。"], fake_model_parser, max_model_calls=1)
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.STAY_WINDOW)
+        self.assertEqual(rules[0].strength, RuleStrength.HARD)
+        self.assertEqual(rules[0].value, {"location": "home", "reason": "sms_notice"})
+        self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
+
+    def test_model_fallback_defaults_missing_strength_to_hard_for_unknown_strong(self):
+        def fake_model_parser(text):
+            return {
+                "rule_type": "stay_window",
+                "value": {"location": "home", "reason": "sms_notice"},
+            }
+
+        rules = parse_preferences_with_fallback(["必须按短信通知留在家中。"], fake_model_parser, max_model_calls=1)
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.STAY_WINDOW)
+        self.assertEqual(rules[0].strength, RuleStrength.HARD)
+        self.assertEqual(rules[0].value, {"location": "home", "reason": "sms_notice"})
+
     def test_model_fallback_does_not_call_model_for_known_rules(self):
         def fail_if_called(text):
             raise AssertionError(f"model parser should not be called for known rule: {text}")
@@ -254,6 +314,21 @@ class PreferenceParserTest(unittest.TestCase):
 
         self.assertEqual(len(second), 1)
         self.assertEqual(second[0].value, {"cargo_id": "240646"})
+
+    def test_parse_preference_text_returns_fresh_nested_value_dicts(self):
+        text = (
+            "须先到（23.21，113.37）接上配偶（原地停留不少于10分钟），"
+            "再返回老家（23.19，113.36）；须在2026年3月10日22:00前进家门，"
+            "到家后须在原处静止，至少待到2026年3月13日22:00。"
+        )
+        first = parse_preference_text(text)
+        first[0].value["steps"][0]["wait_minutes"] = 99
+        first[0].value["deadline"] = "mutated"
+
+        second = parse_preference_text(text)
+
+        self.assertEqual(second[0].value["steps"][0]["wait_minutes"], 10)
+        self.assertEqual(second[0].value["deadline"], "2026-03-10 22:00:00")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from functools import lru_cache
 from typing import Any, Callable, Iterable
 
@@ -54,7 +55,7 @@ def classify_strength(text: str) -> RuleStrength:
 
 
 def parse_preference_text(text: str) -> list[PreferenceRule]:
-    return list(_parse_preference_text_cached(str(text or "").strip()))
+    return [_clone_rule(rule) for rule in _parse_preference_text_cached(str(text or "").strip())]
 
 
 @lru_cache(maxsize=512)
@@ -125,8 +126,11 @@ def parse_preferences_with_fallback(
             continue
 
         calls += 1
-        parsed_rule = _model_payload_to_rule(model_parse_fn, rule)
-        fallback_rules.append(parsed_rule or rule)
+        parsed_rules = _model_payload_to_rules(model_parse_fn, rule)
+        if parsed_rules:
+            fallback_rules.extend(parsed_rules)
+        else:
+            fallback_rules.append(rule)
     return fallback_rules
 
 
@@ -152,28 +156,54 @@ def _unknown_strength(text: str) -> RuleStrength:
     return RuleStrength.UNKNOWN_SOFT
 
 
-def _model_payload_to_rule(model_parse_fn: Callable[[str], Any], original_rule: PreferenceRule) -> PreferenceRule | None:
+def _clone_rule(rule: PreferenceRule) -> PreferenceRule:
+    return PreferenceRule(rule.rule_type, rule.strength, deepcopy(rule.value), rule.source_text)
+
+
+def _model_payload_to_rules(model_parse_fn: Callable[[str], Any], original_rule: PreferenceRule) -> list[PreferenceRule]:
     try:
         payload = model_parse_fn(original_rule.source_text)
     except Exception:
-        return None
+        return []
 
+    rules: list[PreferenceRule] = []
+    for candidate in _model_rule_candidates(payload):
+        converted_rule = _model_candidate_to_rule(candidate, original_rule)
+        if converted_rule is not None:
+            rules.append(converted_rule)
+    return rules
+
+
+def _model_rule_candidates(payload: Any) -> list[Any]:
     if isinstance(payload, PreferenceRule):
+        return [payload]
+    if isinstance(payload, list):
         return payload
-    if not isinstance(payload, dict):
+    if isinstance(payload, dict):
+        rules = payload.get("rules")
+        if isinstance(rules, list):
+            return rules
+        return [payload]
+    return []
+
+
+def _model_candidate_to_rule(candidate: Any, original_rule: PreferenceRule) -> PreferenceRule | None:
+    if isinstance(candidate, PreferenceRule):
+        return _clone_rule(candidate)
+    if not isinstance(candidate, dict):
         return None
 
     try:
-        rule_type = _coerce_rule_type(payload.get("rule_type") or payload.get("type"))
-        strength = _coerce_rule_strength(payload.get("strength"), original_rule.strength)
-        value = payload.get("value", {})
-        source_text = payload.get("source_text") or original_rule.source_text
+        rule_type = _coerce_rule_type(candidate.get("rule_type") or candidate.get("type"))
+        strength = _coerce_rule_strength(candidate.get("strength"), RuleStrength.HARD)
+        value = candidate.get("value", {})
+        source_text = candidate.get("source_text") or original_rule.source_text
     except (TypeError, ValueError):
         return None
 
     if rule_type is None or not isinstance(value, dict):
         return None
-    return PreferenceRule(rule_type, strength, value, source_text)
+    return PreferenceRule(rule_type, strength, deepcopy(value), source_text)
 
 
 def _coerce_rule_type(value: Any) -> RuleType | None:
