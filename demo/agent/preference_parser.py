@@ -5,7 +5,10 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any, Callable, Iterable
 
-from preference_rules import PreferenceRule, RuleStrength, RuleType
+if __package__:
+    from .preference_rules import PreferenceRule, RuleStrength, RuleType
+else:
+    from preference_rules import PreferenceRule, RuleStrength, RuleType
 
 
 _STRONG_UNKNOWN_MARKERS = (

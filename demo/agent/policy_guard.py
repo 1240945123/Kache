@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from preference_rules import PreferenceRule, RuleStrength, RuleType
-from strategy_helpers import Candidate
+if __package__:
+    from .preference_rules import PreferenceRule, RuleStrength, RuleType
+    from .strategy_helpers import Candidate
+else:
+    from preference_rules import PreferenceRule, RuleStrength, RuleType
+    from strategy_helpers import Candidate
 
 DEFAULT_UNKNOWN_STRONG_WAIT_MINUTES = 30
 MINUTES_PER_DAY = 24 * 60

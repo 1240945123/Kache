@@ -6,14 +6,24 @@ import json
 import logging
 from typing import Any
 
-from planner import build_planner_state, choose_required_intent
-from policy_guard import filter_candidates, should_wait_for_window
-from preference_parser import parse_preferences, parse_preferences_with_fallback
-from preference_rules import PreferenceRule, RuleStrength, RuleType
-from scoring import score_candidates
 from simkit.ports import SimulationApiPort
-from strategy_helpers import Candidate
-from strategy_helpers import fallback_wait_action, filter_and_rank_candidates
+
+if __package__:
+    from .planner import build_planner_state, choose_required_intent
+    from .policy_guard import filter_candidates, should_wait_for_window
+    from .preference_parser import parse_preferences, parse_preferences_with_fallback
+    from .preference_rules import PreferenceRule, RuleStrength, RuleType
+    from .scoring import score_candidates
+    from .strategy_helpers import Candidate
+    from .strategy_helpers import fallback_wait_action, filter_and_rank_candidates
+else:
+    from planner import build_planner_state, choose_required_intent
+    from policy_guard import filter_candidates, should_wait_for_window
+    from preference_parser import parse_preferences, parse_preferences_with_fallback
+    from preference_rules import PreferenceRule, RuleStrength, RuleType
+    from scoring import score_candidates
+    from strategy_helpers import Candidate
+    from strategy_helpers import fallback_wait_action, filter_and_rank_candidates
 
 UNENFORCED_HARD_RULE_TYPES = {
     RuleType.BOUNDING_BOX,

@@ -4,8 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
-from strategy_helpers import haversine_km
+if __package__:
+    from .preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
+    from .strategy_helpers import haversine_km
+else:
+    from preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
+    from strategy_helpers import haversine_km
 
 MINUTES_PER_DAY = 24 * 60
 SIMULATION_EPOCH = datetime(2026, 3, 1, 0, 0)

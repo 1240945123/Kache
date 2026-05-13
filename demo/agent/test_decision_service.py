@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -66,6 +67,17 @@ def _cargo(cargo_id="C1", category="普通货物", cargo_name=None, price=500.0)
 
 
 class DecisionServiceTest(unittest.TestCase):
+    def test_decision_service_imports_from_demo_package_context(self):
+        demo_root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, "-c", "from agent.model_decision_service import ModelDecisionService"],
+            cwd=demo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_waits_without_querying_cargo_during_no_drive_window(self):
         api = FakeApi(status=_status())
 

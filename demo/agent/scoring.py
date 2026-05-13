@@ -3,8 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from preference_rules import PreferenceRule, RuleStrength, RuleType
-from strategy_helpers import Candidate
+if __package__:
+    from .preference_rules import PreferenceRule, RuleStrength, RuleType
+    from .strategy_helpers import Candidate
+else:
+    from preference_rules import PreferenceRule, RuleStrength, RuleType
+    from strategy_helpers import Candidate
 
 SOFT_CATEGORY_PENALTY = 80.0
 VALUE_PER_MINUTE_BONUS_FACTOR = 1.0
