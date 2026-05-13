@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from preference_rules import PreferenceRule, RuleStrength, RuleType
 
@@ -30,6 +30,7 @@ _HARD_WORDS = (
     "违约",
     "指定",
     "至少",
+    "须",
 )
 _SOFT_WORDS = (
     "尽量",
@@ -72,6 +73,10 @@ def _parse_preference_text_cached(text: str) -> tuple[PreferenceRule, ...]:
         _parse_daily_rest,
         _parse_required_cargo,
         _parse_monthly_visit_days,
+        _parse_monthly_off_days,
+        _parse_forbidden_zone,
+        _parse_home_deadline,
+        _parse_sequence_task,
     ):
         parsed = parser(text, strength)
         if parsed is not None:
@@ -103,6 +108,28 @@ def parse_preferences(preferences: Iterable[Any]) -> list[PreferenceRule]:
     return rules
 
 
+def parse_preferences_with_fallback(
+    preferences: Iterable[Any],
+    model_parse_fn: Callable[[str], Any] | None = None,
+    max_model_calls: int = 2,
+) -> list[PreferenceRule]:
+    rules = parse_preferences(preferences)
+    if model_parse_fn is None or max_model_calls <= 0:
+        return rules
+
+    fallback_rules: list[PreferenceRule] = []
+    calls = 0
+    for rule in rules:
+        if rule.rule_type != RuleType.UNKNOWN or rule.strength != RuleStrength.UNKNOWN_STRONG or calls >= max_model_calls:
+            fallback_rules.append(rule)
+            continue
+
+        calls += 1
+        parsed_rule = _model_payload_to_rule(model_parse_fn, rule)
+        fallback_rules.append(parsed_rule or rule)
+    return fallback_rules
+
+
 def _preference_text(preference: Any) -> str:
     if isinstance(preference, str):
         return preference.strip()
@@ -123,6 +150,46 @@ def _unknown_strength(text: str) -> RuleStrength:
     if any(marker in text for marker in _STRONG_UNKNOWN_MARKERS):
         return RuleStrength.UNKNOWN_STRONG
     return RuleStrength.UNKNOWN_SOFT
+
+
+def _model_payload_to_rule(model_parse_fn: Callable[[str], Any], original_rule: PreferenceRule) -> PreferenceRule | None:
+    try:
+        payload = model_parse_fn(original_rule.source_text)
+    except Exception:
+        return None
+
+    if isinstance(payload, PreferenceRule):
+        return payload
+    if not isinstance(payload, dict):
+        return None
+
+    try:
+        rule_type = _coerce_rule_type(payload.get("rule_type") or payload.get("type"))
+        strength = _coerce_rule_strength(payload.get("strength"), original_rule.strength)
+        value = payload.get("value", {})
+        source_text = payload.get("source_text") or original_rule.source_text
+    except (TypeError, ValueError):
+        return None
+
+    if rule_type is None or not isinstance(value, dict):
+        return None
+    return PreferenceRule(rule_type, strength, value, source_text)
+
+
+def _coerce_rule_type(value: Any) -> RuleType | None:
+    if isinstance(value, RuleType):
+        return value
+    if isinstance(value, str):
+        return RuleType(value)
+    return None
+
+
+def _coerce_rule_strength(value: Any, default: RuleStrength) -> RuleStrength:
+    if isinstance(value, RuleStrength):
+        return value
+    if isinstance(value, str):
+        return RuleStrength(value)
+    return default
 
 
 def _parse_cargo_categories(text: str, strength: RuleStrength) -> list[tuple[int, PreferenceRule]]:
@@ -221,6 +288,112 @@ def _parse_monthly_visit_days(text: str, strength: RuleStrength) -> tuple[int, P
     if with_coord_word:
         return _monthly_visit_rule(with_coord_word, strength, text, with_coord_word.group(4))
     return None
+
+
+def _parse_monthly_off_days(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"(?:每月|自然月内).*?至少(?:要有)?\s*(\d+)\s*个?整天.*?(?:不接单).*?(?:不空车|空车乱跑)",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.MONTHLY_OFF_DAYS,
+            strength,
+            {"required_days": int(match.group(1))},
+            text,
+        ),
+    )
+
+
+def _parse_forbidden_zone(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"(?:不得|不能|禁止).*?进入.*?[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)].*?半径\s*(\d+(?:\.\d+)?)\s*公里",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.FORBIDDEN_ZONE,
+            strength,
+            {
+                "lat": float(match.group(1)),
+                "lng": float(match.group(2)),
+                "radius_km": float(match.group(3)),
+            },
+            text,
+        ),
+    )
+
+
+def _parse_home_deadline(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"每天\s*(\d{1,2})\s*点前.*?(?:须|必须|务必).*?(?:自家位置|家|老家).*?[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)].*?([一二三四五六七八九十\d.]+)\s*公里内",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.HOME_DEADLINE,
+            strength,
+            {
+                "deadline_minute": int(match.group(1)) * 60,
+                "lat": float(match.group(2)),
+                "lng": float(match.group(3)),
+                "radius_km": _distance_number(match.group(4)),
+            },
+            text,
+        ),
+    )
+
+
+def _parse_sequence_task(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"(?:须|必须).*?先到[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)].*?配偶.*?不少于\s*(\d+)\s*分钟.*?再返回老家[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)].*?须在\s*(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日\s*(\d{1,2}):(\d{2})\s*前进家门.*?至少待到\s*(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日\s*(\d{1,2}):(\d{2})",
+        text,
+    )
+    if not match:
+        return None
+
+    deadline = _format_datetime(match.group(6), match.group(7), match.group(8), match.group(9), match.group(10))
+    stay_until = _format_datetime(match.group(11), match.group(12), match.group(13), match.group(14), match.group(15))
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.SEQUENCE_TASK,
+            strength,
+            {
+                "steps": [
+                    {
+                        "action": "pickup",
+                        "lat": float(match.group(1)),
+                        "lng": float(match.group(2)),
+                        "target": "spouse",
+                        "wait_minutes": int(match.group(3)),
+                    },
+                    {
+                        "action": "return_home",
+                        "lat": float(match.group(4)),
+                        "lng": float(match.group(5)),
+                        "target": "hometown",
+                    },
+                ],
+                "deadline": deadline,
+                "stay_until": stay_until,
+            },
+            text,
+        ),
+    )
+
+
+def _format_datetime(year: str, month: str, day: str, hour: str, minute: str) -> str:
+    return f"{int(year):04d}-{int(month):02d}-{int(day):02d} {int(hour):02d}:{int(minute):02d}:00"
 
 
 def _monthly_visit_rule(

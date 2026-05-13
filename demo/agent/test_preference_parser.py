@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from preference_parser import classify_strength, parse_preference_text, parse_preferences
+from preference_parser import classify_strength, parse_preference_text, parse_preferences, parse_preferences_with_fallback
 from preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
 
 
@@ -96,6 +96,74 @@ class PreferenceParserTest(unittest.TestCase):
 
         self.assertEqual(rule.rule_type, RuleType.MONTHLY_VISIT_DAYS)
         self.assertEqual(rule.value, {"required_days": 5, "lat": 23.13, "lng": 113.26, "radius_km": 1.0})
+
+    def test_monthly_off_days(self):
+        rule = _only_rule("自然月内至少要有2个整天既不接单也不空车乱跑。")
+
+        self.assertEqual(rule.rule_type, RuleType.MONTHLY_OFF_DAYS)
+        self.assertEqual(rule.strength, RuleStrength.HARD)
+        self.assertEqual(rule.value, {"required_days": 2})
+
+    def test_forbidden_zone(self):
+        rule = _only_rule("车辆不得进入以（23.30，113.52）为圆心、半径20公里的区域。")
+
+        self.assertEqual(rule.rule_type, RuleType.FORBIDDEN_ZONE)
+        self.assertEqual(rule.strength, RuleStrength.HARD)
+        self.assertEqual(rule.value, {"lat": 23.30, "lng": 113.52, "radius_km": 20.0})
+
+    def test_home_deadline(self):
+        rule = _only_rule("每天23点前车辆须在自家位置（23.12，113.28）一公里内。")
+
+        self.assertEqual(rule.rule_type, RuleType.HOME_DEADLINE)
+        self.assertEqual(rule.strength, RuleStrength.HARD)
+        self.assertEqual(
+            rule.value,
+            {"deadline_minute": 1380, "lat": 23.12, "lng": 113.28, "radius_km": 1.0},
+        )
+
+    def test_sequence_task(self):
+        rule = _only_rule(
+            "须先到（23.21，113.37）接上配偶（原地停留不少于10分钟），"
+            "再返回老家（23.19，113.36）；须在2026年3月10日22:00前进家门，"
+            "到家后须在原处静止，至少待到2026年3月13日22:00。"
+        )
+
+        self.assertEqual(rule.rule_type, RuleType.SEQUENCE_TASK)
+        self.assertEqual(rule.strength, RuleStrength.HARD)
+        self.assertEqual(
+            rule.value,
+            {
+                "steps": [
+                    {"action": "pickup", "lat": 23.21, "lng": 113.37, "target": "spouse", "wait_minutes": 10},
+                    {"action": "return_home", "lat": 23.19, "lng": 113.36, "target": "hometown"},
+                ],
+                "deadline": "2026-03-10 22:00:00",
+                "stay_until": "2026-03-13 22:00:00",
+            },
+        )
+
+    def test_model_fallback_replaces_unknown_strong_rule(self):
+        calls = []
+
+        def fake_model_parser(text):
+            calls.append(text)
+            return {
+                "rule_type": "stay_window",
+                "strength": "hard",
+                "value": {
+                    "location": "home",
+                    "reason": "sms_notice",
+                },
+            }
+
+        rules = parse_preferences_with_fallback(["必须按短信通知留在家中。"], fake_model_parser, max_model_calls=1)
+
+        self.assertEqual(calls, ["必须按短信通知留在家中。"])
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.STAY_WINDOW)
+        self.assertEqual(rules[0].strength, RuleStrength.HARD)
+        self.assertEqual(rules[0].value, {"location": "home", "reason": "sms_notice"})
+        self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
 
     def test_required_cargo_id(self):
         rule = _only_rule("指定熟货源编号240646")
