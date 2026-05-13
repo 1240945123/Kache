@@ -28,6 +28,8 @@ class RuleType(str, Enum):
     HOME_DEADLINE = "home_deadline"
     STAY_WINDOW = "stay_window"
     SEQUENCE_TASK = "sequence_task"
+    FIRST_ORDER_DEADLINE = "first_order_deadline"
+    DAILY_ORDER_LIMIT = "daily_order_limit"
     UNKNOWN = "unknown"
 
 

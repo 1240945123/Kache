@@ -71,16 +71,25 @@ def _parse_preference_text_cached(text: str) -> tuple[PreferenceRule, ...]:
 
     matches.extend(_parse_cargo_categories(text, strength))
     matches.extend(_parse_distance_limits(text, strength))
+    matches.extend(_parse_real_distance_limits(text, strength))
 
     for parser in (
+        _parse_no_drive_window_variants,
         _parse_no_drive_window,
+        _parse_daily_rest_variants,
         _parse_daily_rest,
         _parse_required_cargo,
         _parse_monthly_visit_days,
+        _parse_monthly_no_order_days,
+        _parse_monthly_off_days_variants,
         _parse_monthly_off_days,
+        _parse_monthly_deadhead_limit,
+        _parse_bounding_box,
         _parse_forbidden_zone,
         _parse_home_deadline,
         _parse_sequence_task,
+        _parse_first_order_deadline,
+        _parse_daily_order_limit,
     ):
         parsed = parser(text, strength)
         if parsed is not None:
@@ -305,6 +314,169 @@ def _parse_distance_limits(text: str, strength: RuleStrength) -> list[tuple[int,
     return rules
 
 
+def _parse_real_distance_limits(text: str, strength: RuleStrength) -> list[tuple[int, PreferenceRule]]:
+    rules: list[tuple[int, PreferenceRule]] = []
+    patterns = (
+        (
+            RuleType.HAUL_DISTANCE_LIMIT,
+            r"(?:单笔货)?装货点至卸货点(?:的)?距离不得超过\s*(\d+(?:\.\d+)?)\s*公里",
+        ),
+        (
+            RuleType.PICKUP_DISTANCE_LIMIT,
+            r"接单后赴装货点的空驶距离不得超过\s*(\d+(?:\.\d+)?)\s*公里",
+        ),
+    )
+    for rule_type, pattern in patterns:
+        for match in re.finditer(pattern, text):
+            rules.append((match.start(), PreferenceRule(rule_type, strength, {"km": float(match.group(1))}, text)))
+    return rules
+
+
+def _parse_no_drive_window_variants(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    patterns = (
+        r"每晚\s*(\d{1,2})\s*点\s*至\s*次日(?:早)?\s*(\d{1,2})\s*点",
+        r"每天凌晨\s*(\d{1,2})\s*点\s*至\s*(\d{1,2})\s*点",
+        r"每天中午\s*(\d{1,2})\s*点\s*至\s*下午\s*(\d{1,2})\s*点",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        start_hour = int(match.group(1))
+        end_hour = int(match.group(2))
+        if "下午" in match.group(0) and end_hour < 12:
+            end_hour += 12
+        return (
+            match.start(),
+            PreferenceRule(
+                RuleType.NO_DRIVE_WINDOW,
+                strength,
+                {
+                    "start_minute": start_hour * 60,
+                    "end_minute": end_hour * 60,
+                    "cross_day": "次日" in match.group(0) or end_hour <= start_hour,
+                },
+                text,
+            ),
+        )
+    return None
+
+
+def _parse_daily_rest_variants(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    if "停车休息" in text:
+        return None
+    match = re.search(
+        r"每天.*?(?:停车|熄火|歇脚|休息).*?(?:休息|歇|歇脚)?.*?(?:满|至少)\s*(\d+(?:\.\d+)?)\s*小时",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.DAILY_REST,
+            strength,
+            {"minutes": int(float(match.group(1)) * 60)},
+            text,
+        ),
+    )
+
+
+def _parse_monthly_no_order_days(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"自然月内至少(?:要有|放空)?\s*([一二三四五六七八九十\d]+)\s*(?:个?整天|天).*?不接单",
+        text,
+    )
+    if not match or re.search(r"不空车|空车乱跑|完全歇着", text):
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.MONTHLY_NO_ORDER_DAYS,
+            strength,
+            {"required_days": _small_int(match.group(1))},
+            text,
+        ),
+    )
+
+
+def _parse_monthly_off_days_variants(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"自然月内至少(?:要有)?\s*([一二三四五六七八九十\d]+)\s*天.*?(?:完全歇着|不接单也不空车乱跑)",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.MONTHLY_OFF_DAYS,
+            strength,
+            {"required_days": _small_int(match.group(1))},
+            text,
+        ),
+    )
+
+
+def _parse_monthly_deadhead_limit(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"(?:一个月|每月|自然月内).*?空驶(?:赶路)?里程(?:总和)?不得超过\s*(\d+(?:\.\d+)?)\s*公里",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(RuleType.MONTHLY_DEADHEAD_LIMIT, strength, {"km": float(match.group(1))}, text),
+    )
+
+
+def _parse_bounding_box(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(
+        r"北纬\s*(-?\d+(?:\.\d+)?)\s*至\s*(-?\d+(?:\.\d+)?)\s*，\s*东经\s*(-?\d+(?:\.\d+)?)\s*至\s*(-?\d+(?:\.\d+)?)",
+        text,
+    )
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(
+            RuleType.BOUNDING_BOX,
+            strength,
+            {
+                "min_lat": float(match.group(1)),
+                "max_lat": float(match.group(2)),
+                "min_lng": float(match.group(3)),
+                "max_lng": float(match.group(4)),
+            },
+            text,
+        ),
+    )
+
+
+def _parse_first_order_deadline(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(r"首单.*?不得晚于当天(凌晨|中午|下午|晚上)?\s*(\d{1,2})\s*点", text)
+    if not match:
+        return None
+    hour = int(match.group(2))
+    if match.group(1) in {"下午", "晚上"} and hour < 12:
+        hour += 12
+    return (
+        match.start(),
+        PreferenceRule(RuleType.FIRST_ORDER_DEADLINE, strength, {"deadline_minute": hour * 60}, text),
+    )
+
+
+def _parse_daily_order_limit(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
+    match = re.search(r"同一天接单不得超过\s*(\d+)\s*单", text)
+    if not match:
+        return None
+    return (
+        match.start(),
+        PreferenceRule(RuleType.DAILY_ORDER_LIMIT, strength, {"max_orders": int(match.group(1))}, text),
+    )
+
+
 def _parse_monthly_visit_days(text: str, strength: RuleStrength) -> tuple[int, PreferenceRule] | None:
     parenthesized = re.search(
         r"(?:每月|自然月内).*?(?:至少)?\s*(\d+)\s*(?:个不同的自然日|天).*?[坐标到过]*[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)].*?(?:半径\s*(\d+(?:\.\d+)?)|([一二三四五六七八九十]+))\s*公里?内?",
@@ -482,3 +654,21 @@ def _distance_number(value: str) -> float:
     if value in chinese_digits:
         return chinese_digits[value]
     return float(value)
+
+
+def _small_int(value: str) -> int:
+    chinese_digits = {
+        "一": 1,
+        "二": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+    }
+    if value in chinese_digits:
+        return chinese_digits[value]
+    return int(value)

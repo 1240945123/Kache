@@ -104,6 +104,33 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(rule.strength, RuleStrength.HARD)
         self.assertEqual(rule.value, {"required_days": 2})
 
+    def test_real_competition_strong_phrases_are_structured_without_model_fallback(self):
+        texts = [
+            "我这人熬不住连轴转，每天至少连续停车熄火休息满8小时。",
+            "我就在深圳干活，不出市。从 22.54,114.06 这一带出车；跑车或停车时，车辆位置须始终在深圳市范围内（北纬22.42至22.89，东经113.74至114.66）。",
+            "自然月内至少要有4个整天不接单。",
+            "每天至少有一段连着停车歇满4小时（真熄火歇脚）。",
+            "一个月空驶赶路里程总和不得超过100公里；仅对超出部分按公里计罚。",
+            "每天凌晨2点至5点不接单、不空车赶路（从发车赶路或去接单时刻计）。",
+            "只要这天接了单，首单开工不得晚于当天中午12点。",
+            "同一天接单不得超过3单；每多一单按单计罚（无月度封顶）。",
+            "每天中午12点至下午1点吃饭歇脚，不接单、不空车赶路。",
+            "单笔货装货点至卸货点的距离不得超过100公里。",
+            "接单后赴装货点的空驶距离不得超过90公里。",
+            "每晚23点至次日早6点不接单、不空车赶路。",
+            "自然月内至少放空一整天不接单。",
+            "自然月内至少要有2天完全歇着：不接单也不空车乱跑。",
+        ]
+
+        rules = parse_preferences(texts)
+        unknown_strong_sources = [
+            rule.source_text
+            for rule in rules
+            if rule.rule_type == RuleType.UNKNOWN and rule.strength == RuleStrength.UNKNOWN_STRONG
+        ]
+
+        self.assertEqual(unknown_strong_sources, [])
+
     def test_forbidden_zone(self):
         rule = _only_rule("车辆不得进入以（23.30，113.52）为圆心、半径20公里的区域。")
 
