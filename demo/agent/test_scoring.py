@@ -40,6 +40,14 @@ class ScoringTest(unittest.TestCase):
 
         self.assertEqual([item.candidate.cargo_id for item in scored], ["HIGH", "LOW"])
 
+    def test_score_candidates_ties_by_cargo_id_when_numeric_scores_are_equal(self):
+        second = _candidate(cargo_id="C2")
+        first = _candidate(cargo_id="C1")
+
+        scored = score_candidates([second, first], [], cargo_by_id={})
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["C1", "C2"])
+
     def test_soft_cargo_category_penalty_can_lower_candidate(self):
         avoided = _candidate(cargo_id="A", rough_net_value=300.0, value_per_minute=1.0)
         normal = _candidate(cargo_id="B", rough_net_value=260.0, value_per_minute=1.0)

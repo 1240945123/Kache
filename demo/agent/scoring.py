@@ -68,6 +68,7 @@ def score_candidates(
             -item.candidate.value_per_minute,
             item.candidate.pickup_distance_km,
             item.candidate.estimated_finish_minute,
+            item.candidate.cargo_id,
         )
     )
     return scored
