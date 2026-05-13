@@ -7,6 +7,7 @@ from strategy_helpers import Candidate
 
 DEFAULT_UNKNOWN_STRONG_WAIT_MINUTES = 30
 MINUTES_PER_DAY = 24 * 60
+CARGO_CATEGORY_KEYS = ("category", "cargo_name", "cargo_type", "goods_type")
 
 
 def _wait_action(duration_minutes: int) -> dict[str, Any]:
@@ -37,9 +38,7 @@ def _remaining_window_minutes(current_minute: int, rule: PreferenceRule) -> int 
     minute = _current_day_minute(current_minute)
     if cross_day:
         if minute >= start_minute:
-            elapsed_since_start = minute - start_minute
-            remaining = end_minute - elapsed_since_start
-            return remaining if remaining > 0 else None
+            return (MINUTES_PER_DAY - minute) + end_minute
         if minute < end_minute:
             return end_minute - minute
         return None
@@ -73,7 +72,8 @@ def is_candidate_allowed(
             continue
         if rule.rule_type == RuleType.CARGO_CATEGORY:
             cargo = cargo_by_id.get(candidate.cargo_id, {})
-            if cargo.get("category") == rule.value.get("category"):
+            blocked_category = rule.value.get("category")
+            if blocked_category in {cargo.get(key) for key in CARGO_CATEGORY_KEYS}:
                 return False
         elif rule.rule_type == RuleType.PICKUP_DISTANCE_LIMIT:
             try:

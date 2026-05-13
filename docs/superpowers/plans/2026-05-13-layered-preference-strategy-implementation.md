@@ -656,7 +656,7 @@ class PolicyGuardTest(unittest.TestCase):
             "23-6不接单不空驶",
         )
         wait = should_wait_for_window(current_minute=23 * 60 + 5, rules=[rule])
-        self.assertEqual(wait, {"action": "wait", "params": {"duration_minutes": 355}})
+        self.assertEqual(wait, {"action": "wait", "params": {"duration_minutes": 415}})
 
     def test_unknown_strong_blocks_candidates(self):
         candidate = _candidate()
@@ -731,7 +731,7 @@ def should_wait_for_window(current_minute: int, rules: list[PreferenceRule]) -> 
 
 def _candidate_category(candidate: Candidate, cargo_by_id: dict[str, dict[str, Any]]) -> str:
     cargo = cargo_by_id.get(candidate.cargo_id, {})
-    return str(cargo.get("category") or cargo.get("cargo_type") or cargo.get("goods_type") or "")
+    return str(cargo.get("category") or cargo.get("cargo_name") or cargo.get("cargo_type") or cargo.get("goods_type") or "")
 
 
 def is_candidate_allowed(candidate: Candidate, rules: list[PreferenceRule], *, cargo_by_id: dict[str, dict[str, Any]]) -> bool:
@@ -1050,7 +1050,7 @@ class ScoredCandidate:
 
 def _cargo_category(candidate: Candidate, cargo_by_id: dict[str, dict[str, Any]]) -> str:
     cargo = cargo_by_id.get(candidate.cargo_id, {})
-    return str(cargo.get("category") or cargo.get("cargo_type") or cargo.get("goods_type") or "")
+    return str(cargo.get("category") or cargo.get("cargo_name") or cargo.get("cargo_type") or cargo.get("goods_type") or "")
 
 
 def score_candidate(candidate: Candidate, rules: list[PreferenceRule], *, cargo_by_id: dict[str, dict[str, Any]]) -> ScoredCandidate:

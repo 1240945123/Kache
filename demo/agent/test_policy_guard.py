@@ -44,6 +44,18 @@ class PolicyGuardTest(unittest.TestCase):
 
         self.assertFalse(allowed)
 
+    def test_forbidden_hard_cargo_category_matches_cargo_name(self):
+        candidate = _candidate(cargo_id="C1")
+        rules = [_rule(RuleType.CARGO_CATEGORY, value={"category": "煤炭矿产"})]
+
+        allowed = is_candidate_allowed(
+            candidate,
+            rules,
+            cargo_by_id={"C1": {"cargo_name": "煤炭矿产"}},
+        )
+
+        self.assertFalse(allowed)
+
     def test_pickup_distance_limit_removes_candidate_over_limit(self):
         candidate = _candidate(pickup_distance_km=31.0)
         rules = [_rule(RuleType.PICKUP_DISTANCE_LIMIT, value={"km": 30.0})]
@@ -56,7 +68,7 @@ class PolicyGuardTest(unittest.TestCase):
 
         self.assertFalse(is_candidate_allowed(candidate, rules, cargo_by_id={"C1": {"category": "钢材"}}))
 
-    def test_no_drive_window_during_2305_returns_wait_action_duration_355(self):
+    def test_no_drive_window_during_2305_returns_wait_action_duration_415(self):
         rules = [
             _rule(
                 RuleType.NO_DRIVE_WINDOW,
@@ -66,7 +78,7 @@ class PolicyGuardTest(unittest.TestCase):
 
         action = should_wait_for_window(1385, rules)
 
-        self.assertEqual(action, {"action": "wait", "params": {"duration_minutes": 355}})
+        self.assertEqual(action, {"action": "wait", "params": {"duration_minutes": 415}})
 
     def test_unknown_strong_blocks_candidates(self):
         candidates = [_candidate(cargo_id="C1"), _candidate(cargo_id="C2")]
