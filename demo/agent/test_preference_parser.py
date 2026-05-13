@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from preference_parser import classify_strength, parse_preference_text, parse_preferences
-from preference_rules import PlannedIntent, RuleStrength, RuleType
+from preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
 
 
 def _only_rule(text: str):
@@ -41,53 +41,81 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(classify_strength("尽量接短途单，最好不要绕路"), RuleStrength.SOFT)
 
     def test_forbidden_categories_extracts_multiple_chinese_quoted_categories(self):
-        rule = _only_rule("不接“钢材”、“煤炭”类货物")
+        rules = parse_preference_text("不接“钢材”、“煤炭”类货物")
 
-        self.assertEqual(rule.rule_type, RuleType.CARGO_CATEGORY)
-        self.assertEqual(rule.strength, RuleStrength.HARD)
-        self.assertEqual(rule.source_text, "不接“钢材”、“煤炭”类货物")
-        self.assertEqual(rule.value["forbidden_categories"], ["钢材", "煤炭"])
+        self.assertEqual([rule.rule_type for rule in rules], [RuleType.CARGO_CATEGORY, RuleType.CARGO_CATEGORY])
+        self.assertEqual([rule.strength for rule in rules], [RuleStrength.HARD, RuleStrength.HARD])
+        self.assertEqual(
+            [rule.value for rule in rules],
+            [{"category": "钢材", "mode": "forbid"}, {"category": "煤炭", "mode": "forbid"}],
+        )
+        self.assertEqual([rule.source_text for rule in rules], ["不接“钢材”、“煤炭”类货物"] * 2)
+
+    def test_plan_phrase_categories_extracts_one_rule_per_category(self):
+        rules = parse_preference_text("不接货源品类为「化工塑料」或「煤炭矿产」的订单。")
+
+        self.assertEqual([rule.rule_type for rule in rules], [RuleType.CARGO_CATEGORY, RuleType.CARGO_CATEGORY])
+        self.assertEqual(
+            [rule.value for rule in rules],
+            [{"category": "化工塑料", "mode": "forbid"}, {"category": "煤炭矿产", "mode": "forbid"}],
+        )
 
     def test_cross_day_no_drive_window(self):
-        rules = parse_preference_text("每天23点至次日6点不接单、不空车赶路")
+        rule = _only_rule("每天23点至次日6点不接单、不空车赶路")
 
-        self.assertEqual(len(rules), 1)
-        rule = rules[0]
         self.assertEqual(rule.rule_type, RuleType.NO_DRIVE_WINDOW)
         self.assertEqual(rule.strength, RuleStrength.HARD)
-        self.assertEqual(rule.value["start_minute"], 23 * 60)
-        self.assertEqual(rule.value["end_minute"], 6 * 60)
-        self.assertTrue(rule.value["cross_day"])
-        self.assertEqual(rule.value["restrictions"], ["no_order", "no_deadhead"])
+        self.assertEqual(rule.value, {"start_minute": 1380, "end_minute": 360, "cross_day": True})
 
     def test_daily_rest_hours(self):
         rule = _only_rule("每天至少有一段连着停车休息满5小时")
 
         self.assertEqual(rule.rule_type, RuleType.DAILY_REST)
-        self.assertEqual(rule.value["minutes"], 300)
-        self.assertTrue(rule.value["continuous"])
+        self.assertEqual(rule.value, {"minutes": 300})
 
     def test_haul_and_pickup_distance_limits_in_one_text(self):
         rules = parse_preference_text("接货距离不超过20公里，运输距离最多300公里")
 
         self.assertEqual([rule.rule_type for rule in rules], [RuleType.PICKUP_DISTANCE_LIMIT, RuleType.HAUL_DISTANCE_LIMIT])
-        self.assertEqual([rule.value["max_km"] for rule in rules], [20, 300])
+        self.assertEqual([rule.value for rule in rules], [{"km": 20.0}, {"km": 300.0}])
+
+    def test_plan_phrase_haul_and_pickup_distance_limits(self):
+        rules = parse_preference_text("单笔装卸距离不得超过150公里，赴装货点空驶距离不得超过90公里。")
+
+        self.assertEqual([rule.rule_type for rule in rules], [RuleType.HAUL_DISTANCE_LIMIT, RuleType.PICKUP_DISTANCE_LIMIT])
+        self.assertEqual([rule.value for rule in rules], [{"km": 150.0}, {"km": 90.0}])
 
     def test_monthly_visit_days_coordinate_target_with_radius(self):
         rule = _only_rule("每月至少有2天到坐标(31.2304,121.4737)附近半径10公里")
 
         self.assertEqual(rule.rule_type, RuleType.MONTHLY_VISIT_DAYS)
-        self.assertEqual(rule.value["min_days"], 2)
-        self.assertEqual(rule.value["lat"], 31.2304)
-        self.assertEqual(rule.value["lng"], 121.4737)
-        self.assertEqual(rule.value["radius_km"], 10)
+        self.assertEqual(rule.value, {"required_days": 2, "lat": 31.2304, "lng": 121.4737, "radius_km": 10.0})
+
+    def test_plan_phrase_monthly_visit_days_coordinate_target_with_radius(self):
+        rule = _only_rule("自然月内至少5个不同的自然日到过（23.13，113.26）一公里内。")
+
+        self.assertEqual(rule.rule_type, RuleType.MONTHLY_VISIT_DAYS)
+        self.assertEqual(rule.value, {"required_days": 5, "lat": 23.13, "lng": 113.26, "radius_km": 1.0})
 
     def test_required_cargo_id(self):
         rule = _only_rule("指定熟货源编号240646")
 
         self.assertEqual(rule.rule_type, RuleType.REQUIRED_CARGO)
         self.assertEqual(rule.strength, RuleStrength.HARD)
-        self.assertEqual(rule.value["cargo_id"], "240646")
+        self.assertEqual(rule.value, {"cargo_id": "240646"})
+
+    def test_unparsed_strong_marker_becomes_unknown_strong(self):
+        rule = _only_rule("必须按短信通知留在家中。")
+
+        self.assertEqual(rule.rule_type, RuleType.UNKNOWN)
+        self.assertEqual(rule.strength, RuleStrength.UNKNOWN_STRONG)
+        self.assertEqual(rule.value, {})
+
+    def test_unparsed_soft_text_becomes_unknown_soft(self):
+        rule = _only_rule("希望下午路线更顺一些")
+
+        self.assertEqual(rule.rule_type, RuleType.UNKNOWN)
+        self.assertEqual(rule.strength, RuleStrength.UNKNOWN_SOFT)
 
     def test_parse_preferences_caches_and_deduplicates_by_text(self):
         preference = {"text": "指定熟货源编号240646"}
@@ -98,7 +126,15 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(rules[0].rule_type, RuleType.REQUIRED_CARGO)
         self.assertEqual(rules[0].value, {"cargo_id": "240646"})
         self.assertEqual(rules[0].source_text, "指定熟货源编号240646")
-        self.assertIs(parse_preference_text("指定熟货源编号240646"), parse_preference_text("指定熟货源编号240646"))
+
+    def test_parse_preference_text_returns_fresh_mutable_lists(self):
+        first = parse_preference_text("指定熟货源编号240646")
+        first.append(PreferenceRule(RuleType.UNKNOWN, RuleStrength.UNKNOWN_SOFT, {}, "mutated"))
+
+        second = parse_preference_text("指定熟货源编号240646")
+
+        self.assertEqual(len(second), 1)
+        self.assertEqual(second[0].value, {"cargo_id": "240646"})
 
 
 if __name__ == "__main__":
