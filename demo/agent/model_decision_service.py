@@ -49,25 +49,28 @@ class ModelDecisionService:
         preferences = status.get("preferences", [])
         rules = parse_preferences(preferences)
         unknown_strong_sources = self._unknown_strong_sources(rules)
-        history = self._safe_history(driver_id)
-        state = build_planner_state(status, history)
         deterministic_rules = [rule for rule in rules if rule.rule_type != RuleType.UNKNOWN]
 
-        window_wait = should_wait_for_window(state.current_minute, deterministic_rules)
+        current_minute = int(status.get("simulation_progress_minutes", 0) or 0)
+        window_wait = should_wait_for_window(current_minute, deterministic_rules)
         if window_wait is not None:
             self._logger.info("decision required_wait driver_id=%s action=%s", driver_id, window_wait)
             return window_wait
 
-        intent = choose_required_intent(state, deterministic_rules)
-        if intent is not None:
-            action = {"action": intent.action, "params": intent.params}
-            self._logger.info(
-                "decision planner_intent driver_id=%s intent=%s action=%s",
-                driver_id,
-                intent.intent_type,
-                action,
-            )
-            return action
+        history_step = self._history_step_for_planner(deterministic_rules)
+        if history_step is not None:
+            history = self._safe_history(driver_id, history_step)
+            state = build_planner_state(status, history)
+            intent = choose_required_intent(state, deterministic_rules)
+            if intent is not None:
+                action = {"action": intent.action, "params": intent.params}
+                self._logger.info(
+                    "decision planner_intent driver_id=%s intent=%s action=%s",
+                    driver_id,
+                    intent.intent_type,
+                    action,
+                )
+                return action
 
         rules = parse_preferences_with_fallback(
             preferences,
@@ -111,9 +114,20 @@ class ModelDecisionService:
         self._logger.info("decision fallback_wait driver_id=%s action=%s", driver_id, action)
         return action
 
-    def _safe_history(self, driver_id: str) -> dict[str, Any]:
+    def _history_step_for_planner(self, rules: list[PreferenceRule]) -> int | None:
+        needs_daily_rest = False
+        for rule in rules:
+            if rule.strength != RuleStrength.HARD:
+                continue
+            if rule.rule_type == RuleType.MONTHLY_VISIT_DAYS:
+                return -1
+            if rule.rule_type == RuleType.DAILY_REST:
+                needs_daily_rest = True
+        return 100 if needs_daily_rest else None
+
+    def _safe_history(self, driver_id: str, step: int) -> dict[str, Any]:
         try:
-            history = self._api.query_decision_history(driver_id, -1)
+            history = self._api.query_decision_history(driver_id, step)
         except Exception as exc:
             self._logger.warning("query_decision_history failed driver_id=%s error=%s", driver_id, exc)
             return {"records": []}

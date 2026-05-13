@@ -18,6 +18,8 @@ class FakeApi:
         self.model_response = model_response
         self.query_count = 0
         self.model_count = 0
+        self.history_count = 0
+        self.history_steps = []
 
     def get_driver_status(self, driver_id):
         return dict(self.status, driver_id=driver_id)
@@ -27,6 +29,8 @@ class FakeApi:
         return {"driver_id": driver_id, "items": self.cargo_items}
 
     def query_decision_history(self, driver_id, step):
+        self.history_count += 1
+        self.history_steps.append(step)
         return self.history
 
     def model_chat_completion(self, payload):
@@ -85,6 +89,7 @@ class DecisionServiceTest(unittest.TestCase):
 
         self.assertEqual(action["action"], "wait")
         self.assertEqual(api.query_count, 0)
+        self.assertEqual(api.history_count, 0)
 
     def test_takes_safe_candidate_outside_window_without_model(self):
         api = FakeApi(status=_status(simulation_progress_minutes=8 * 60, preferences=[]), cargo_items=[_cargo()])
@@ -93,6 +98,7 @@ class DecisionServiceTest(unittest.TestCase):
 
         self.assertEqual(action, {"action": "take_order", "params": {"cargo_id": "C1"}})
         self.assertEqual(api.model_count, 0)
+        self.assertEqual(api.history_count, 0)
 
     def test_forbidden_category_candidate_falls_back_to_wait(self):
         api = FakeApi(
