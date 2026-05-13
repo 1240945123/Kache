@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+import unittest
+
+from preference_rules import PreferenceRule, RuleStrength, RuleType
+from scoring import score_candidates
+from strategy_helpers import Candidate
+
+
+def _candidate(**overrides):
+    base = {
+        "cargo_id": "C1",
+        "price": 500.0,
+        "pickup_distance_km": 10.0,
+        "pickup_minutes": 10,
+        "wait_minutes": 0,
+        "cost_time_minutes": 120,
+        "estimated_finish_minute": 200,
+        "haul_distance_km": 100.0,
+        "rough_net_value": 300.0,
+        "value_per_minute": 2.0,
+        "start": {"lat": 22.55, "lng": 114.07},
+        "end": {"lat": 22.8, "lng": 114.2},
+        "load_time": None,
+    }
+    base.update(overrides)
+    return Candidate(**base)
+
+
+def _rule(rule_type, strength=RuleStrength.SOFT, value=None):
+    return PreferenceRule(rule_type, strength, value or {}, "test preference")
+
+
+class ScoringTest(unittest.TestCase):
+    def test_score_candidates_ranks_by_rough_net_value_without_preferences(self):
+        low = _candidate(cargo_id="LOW", rough_net_value=260.0, value_per_minute=1.0)
+        high = _candidate(cargo_id="HIGH", rough_net_value=300.0, value_per_minute=1.0)
+
+        scored = score_candidates([low, high], [], cargo_by_id={})
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["HIGH", "LOW"])
+
+    def test_soft_cargo_category_penalty_can_lower_candidate(self):
+        avoided = _candidate(cargo_id="A", rough_net_value=300.0, value_per_minute=1.0)
+        normal = _candidate(cargo_id="B", rough_net_value=260.0, value_per_minute=1.0)
+        rules = [_rule(RuleType.CARGO_CATEGORY, value={"category": "食品饮料"})]
+
+        scored = score_candidates(
+            [avoided, normal],
+            rules,
+            cargo_by_id={"A": {"category": "食品饮料"}, "B": {"category": "钢材"}},
+        )
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["B", "A"])
+        self.assertTrue(any("soft cargo category" in reason for reason in scored[1].reasons))
+
+
+if __name__ == "__main__":
+    unittest.main()
