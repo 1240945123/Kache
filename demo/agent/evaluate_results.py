@@ -82,6 +82,9 @@ def build_report(results_dir: Path, *, experiment_id: str) -> str:
     )
     for row in driver_rows:
         driver_id = str(row.get("driver_id", ""))
+        income = row.get("income", {})
+        if not isinstance(income, dict):
+            income = {}
         counts = _action_counts(results_dir, driver_id)
         preference_check = row.get("preference_check", {})
         rules = preference_check.get("rules", []) if isinstance(preference_check, dict) else []
@@ -89,10 +92,10 @@ def build_report(results_dir: Path, *, experiment_id: str) -> str:
         lines.append(
             "| {driver_id} | {gross} | {cost} | {penalty} | {net} | {aborted} | {rules} | {actions} |".format(
                 driver_id=driver_id,
-                gross=row.get("gross", ""),
-                cost=row.get("cost", ""),
-                penalty=row.get("penalty", ""),
-                net=row.get("net", ""),
+                gross=income.get("gross_income", ""),
+                cost=income.get("cost", ""),
+                penalty=income.get("preference_penalty", ""),
+                net=income.get("net_income", ""),
                 aborted=row.get("calculation_aborted", ""),
                 rules=len(rules),
                 actions=action_text,

@@ -24,10 +24,12 @@ class EvaluateResultsTest(unittest.TestCase):
                         "drivers": [
                             {
                                 "driver_id": "D001",
-                                "gross": 200,
-                                "cost": 50,
-                                "penalty": 20,
-                                "net": 130,
+                                "income": {
+                                    "gross_income": 200.0,
+                                    "cost": 50.0,
+                                    "preference_penalty": 20.0,
+                                    "net_income": 130.0,
+                                },
                                 "calculation_aborted": False,
                                 "preference_check": {"rules": [{"rule": "sample"}]},
                             }
@@ -60,7 +62,7 @@ class EvaluateResultsTest(unittest.TestCase):
 
         self.assertIn("# Experiment unit-test", report)
         self.assertIn("total_net_income_all_drivers", report)
-        self.assertIn("| D001 |", report)
+        self.assertIn("| D001 | 200.0 | 50.0 | 20.0 | 130.0 |", report)
         self.assertIn("take_order=1", report)
 
 
