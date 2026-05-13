@@ -37,7 +37,7 @@ def classify_strength(text: str) -> RuleStrength:
         return RuleStrength.HARD
     if any(word in normalized for word in _SOFT_WORDS):
         return RuleStrength.SOFT
-    return RuleStrength.UNKNOWN
+    return RuleStrength.UNKNOWN_SOFT
 
 
 @lru_cache(maxsize=512)
@@ -67,7 +67,7 @@ def parse_preference_text(text: str) -> list[PreferenceRule]:
     matches.extend(_parse_distance_limits(normalized, strength))
 
     if not matches:
-        return [PreferenceRule(RuleType.UNKNOWN, strength, normalized, {})]
+        return [PreferenceRule(RuleType.UNKNOWN, strength, {}, normalized)]
 
     matches.sort(key=lambda item: item[0])
     return [rule for _, rule in matches]
@@ -110,8 +110,8 @@ def _parse_forbidden_categories(text: str, strength: RuleStrength) -> Preference
     return PreferenceRule(
         RuleType.CARGO_CATEGORY,
         strength,
-        text,
         {"forbidden_categories": categories},
+        text,
     )
 
 
@@ -121,6 +121,7 @@ def _parse_no_drive_window(text: str, strength: RuleStrength) -> tuple[int, Pref
         return None
     start_hour = int(match.group(1))
     end_hour = int(match.group(3))
+    cross_day = bool(match.group(2)) or end_hour <= start_hour
     restrictions: list[str] = []
     if "不接单" in text:
         restrictions.append("no_order")
@@ -131,13 +132,13 @@ def _parse_no_drive_window(text: str, strength: RuleStrength) -> tuple[int, Pref
         PreferenceRule(
             RuleType.NO_DRIVE_WINDOW,
             strength,
-            text,
             {
-                "start_hour": start_hour,
-                "end_hour": end_hour,
-                "crosses_day": bool(match.group(2)) or end_hour <= start_hour,
+                "start_minute": start_hour * 60,
+                "end_minute": end_hour * 60,
+                "cross_day": cross_day,
                 "restrictions": restrictions,
             },
+            text,
         ),
     )
 
@@ -151,11 +152,11 @@ def _parse_daily_rest(text: str, strength: RuleStrength) -> tuple[int, Preferenc
         PreferenceRule(
             RuleType.DAILY_REST,
             strength,
-            text,
             {
-                "min_hours": _number(match.group(3)),
+                "minutes": int(float(match.group(3)) * 60),
                 "continuous": "连着" in text or "连续" in text,
             },
+            text,
         ),
     )
 
@@ -171,7 +172,7 @@ def _parse_distance_limits(text: str, strength: RuleStrength) -> list[tuple[int,
             rules.append(
                 (
                     match.start(),
-                    PreferenceRule(rule_type, strength, text, {"max_km": _number(match.group(1))}),
+                    PreferenceRule(rule_type, strength, {"max_km": _number(match.group(1))}, text),
                 )
             )
     return rules
@@ -189,13 +190,13 @@ def _parse_monthly_visit_days(text: str, strength: RuleStrength) -> tuple[int, P
         PreferenceRule(
             RuleType.MONTHLY_VISIT_DAYS,
             strength,
-            text,
             {
                 "min_days": int(match.group(1)),
                 "lat": float(match.group(2)),
                 "lng": float(match.group(3)),
                 "radius_km": _number(match.group(4)),
             },
+            text,
         ),
     )
 
@@ -209,8 +210,8 @@ def _parse_required_cargo(text: str, strength: RuleStrength) -> tuple[int, Prefe
         PreferenceRule(
             RuleType.REQUIRED_CARGO,
             strength,
-            text,
             {"cargo_id": match.group(1)},
+            text,
         ),
     )
 

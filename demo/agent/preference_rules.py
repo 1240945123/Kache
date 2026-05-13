@@ -8,7 +8,8 @@ from typing import Any
 class RuleStrength(str, Enum):
     HARD = "hard"
     SOFT = "soft"
-    UNKNOWN = "unknown"
+    UNKNOWN_STRONG = "unknown_strong"
+    UNKNOWN_SOFT = "unknown_soft"
 
 
 class RuleType(str, Enum):
@@ -34,11 +35,15 @@ class RuleType(str, Enum):
 class PreferenceRule:
     rule_type: RuleType
     strength: RuleStrength
-    text: str
-    params: dict[str, Any] = field(default_factory=dict)
+    value: dict[str, Any]
+    source_text: str
 
 
 @dataclass(frozen=True)
 class PlannedIntent:
-    rules: list[PreferenceRule] = field(default_factory=list)
-    notes: list[str] = field(default_factory=list)
+    intent_type: str
+    action: str
+    params: dict[str, Any]
+    reason: str
+    priority: int = 0
+    metadata: dict[str, Any] = field(default_factory=dict)
