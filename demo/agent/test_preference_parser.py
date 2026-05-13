@@ -165,6 +165,57 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(rules[0].value, {"location": "home", "reason": "sms_notice"})
         self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
 
+    def test_model_fallback_does_not_call_model_for_known_rules(self):
+        def fail_if_called(text):
+            raise AssertionError(f"model parser should not be called for known rule: {text}")
+
+        rules = parse_preferences_with_fallback(["指定熟货源编号240646"], fail_if_called, max_model_calls=1)
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.REQUIRED_CARGO)
+        self.assertEqual(rules[0].strength, RuleStrength.HARD)
+        self.assertEqual(rules[0].value, {"cargo_id": "240646"})
+
+    def test_model_fallback_does_not_call_model_for_unknown_soft_rules(self):
+        def fail_if_called(text):
+            raise AssertionError(f"model parser should not be called for unknown soft rule: {text}")
+
+        rules = parse_preferences_with_fallback(["希望下午路线更顺一些"], fail_if_called, max_model_calls=1)
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.UNKNOWN)
+        self.assertEqual(rules[0].strength, RuleStrength.UNKNOWN_SOFT)
+        self.assertEqual(rules[0].value, {})
+        self.assertEqual(rules[0].source_text, "希望下午路线更顺一些")
+
+    def test_model_fallback_preserves_unknown_strong_when_model_fails(self):
+        def raise_model_error(text):
+            raise RuntimeError("model unavailable")
+
+        rules = parse_preferences_with_fallback(["必须按短信通知留在家中。"], raise_model_error, max_model_calls=1)
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.UNKNOWN)
+        self.assertEqual(rules[0].strength, RuleStrength.UNKNOWN_STRONG)
+        self.assertEqual(rules[0].value, {})
+        self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
+
+    def test_model_fallback_preserves_unknown_strong_when_model_payload_is_not_convertible(self):
+        def return_unconvertible_payload(text):
+            return {"rule_type": "not_a_rule_type", "strength": "hard", "value": {}}
+
+        rules = parse_preferences_with_fallback(
+            ["必须按短信通知留在家中。"],
+            return_unconvertible_payload,
+            max_model_calls=1,
+        )
+
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].rule_type, RuleType.UNKNOWN)
+        self.assertEqual(rules[0].strength, RuleStrength.UNKNOWN_STRONG)
+        self.assertEqual(rules[0].value, {})
+        self.assertEqual(rules[0].source_text, "必须按短信通知留在家中。")
+
     def test_required_cargo_id(self):
         rule = _only_rule("指定熟货源编号240646")
 
