@@ -48,6 +48,7 @@ class ModelDecisionService:
         status = self._api.get_driver_status(driver_id)
         preferences = status.get("preferences", [])
         rules = parse_preferences(preferences)
+        unknown_strong_sources = self._unknown_strong_sources(rules)
         history = self._safe_history(driver_id)
         state = build_planner_state(status, history)
         deterministic_rules = [rule for rule in rules if rule.rule_type != RuleType.UNKNOWN]
@@ -73,9 +74,9 @@ class ModelDecisionService:
             model_parse_fn=self._model_parse_preference,
             max_model_calls=1,
         )
-        if self._has_unenforced_hard_rule(rules):
+        if self._has_unenforced_fallback_rule(rules, unknown_strong_sources):
             action = fallback_wait_action()
-            self._logger.info("decision unenforced_hard_rule driver_id=%s action=%s", driver_id, action)
+            self._logger.info("decision unenforced_fallback_rule driver_id=%s action=%s", driver_id, action)
             return action
 
         lat = float(status["current_lat"])
@@ -118,8 +119,22 @@ class ModelDecisionService:
             return {"records": []}
         return history if isinstance(history, dict) else {"records": []}
 
-    def _has_unenforced_hard_rule(self, rules: list[PreferenceRule]) -> bool:
-        return any(rule.strength == RuleStrength.HARD and rule.rule_type in UNENFORCED_HARD_RULE_TYPES for rule in rules)
+    def _unknown_strong_sources(self, rules: list[PreferenceRule]) -> set[str]:
+        return {
+            rule.source_text
+            for rule in rules
+            if rule.rule_type == RuleType.UNKNOWN and rule.strength == RuleStrength.UNKNOWN_STRONG
+        }
+
+    def _has_unenforced_fallback_rule(self, rules: list[PreferenceRule], unknown_strong_sources: set[str]) -> bool:
+        for rule in rules:
+            if rule.source_text not in unknown_strong_sources:
+                continue
+            if rule.strength == RuleStrength.UNKNOWN_STRONG:
+                return True
+            if rule.strength == RuleStrength.HARD and rule.rule_type in UNENFORCED_HARD_RULE_TYPES:
+                return True
+        return False
 
     def _required_cargo_ids(self, rules: list[PreferenceRule]) -> set[str]:
         cargo_ids: set[str] = set()

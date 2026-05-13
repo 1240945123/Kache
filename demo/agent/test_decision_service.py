@@ -136,6 +136,22 @@ class DecisionServiceTest(unittest.TestCase):
 
         self.assertEqual(action["action"], "wait")
 
+    def test_known_monthly_off_rule_does_not_block_safe_candidate(self):
+        monthly_off = (
+            "\u81ea\u7136\u6708\u5185\u81f3\u5c11\u8981\u67092\u4e2a"
+            "\u6574\u5929\u65e2\u4e0d\u63a5\u5355\u4e5f\u4e0d"
+            "\u7a7a\u8f66\u4e71\u8dd1\u3002"
+        )
+        api = FakeApi(
+            status=_status(simulation_progress_minutes=8 * 60, preferences=[monthly_off]),
+            cargo_items=[_cargo()],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action, {"action": "take_order", "params": {"cargo_id": "C1"}})
+        self.assertEqual(api.model_count, 0)
+
     def test_unenforced_hard_rule_from_model_fallback_waits(self):
         api = FakeApi(
             status=_status(
