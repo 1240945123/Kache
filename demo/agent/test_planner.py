@@ -77,6 +77,102 @@ class PlannerTest(unittest.TestCase):
         self.assertEqual(intent.action, "reposition")
         self.assertEqual(intent.params, {"latitude": 31.2304, "longitude": 121.4737})
 
+    def test_monthly_visit_intent_is_none_when_enough_distinct_visit_days_satisfied(self):
+        history = {
+            "records": [
+                {
+                    "action": {"action": "reposition", "params": {"latitude": 31.2304, "longitude": 121.4737}},
+                    "position_after": {"lat": 31.2304, "lng": 121.4737},
+                    "simulation_end_time": "2026-03-01 05:00",
+                    "step_elapsed_minutes": 60,
+                },
+                {
+                    "action": {"action": "wait", "params": {"duration_minutes": 30}},
+                    "position_after": {"lat": 31.2310, "lng": 121.4740},
+                    "simulation_end_time": "2026-03-02 01:00",
+                    "step_elapsed_minutes": 30,
+                },
+            ]
+        }
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 1440 + 60,
+                "current_lat": 31.2310,
+                "current_lng": 121.4740,
+                "completed_order_count": 0,
+            },
+            history,
+        )
+        rules = [_rule(RuleType.MONTHLY_VISIT_DAYS, {"required_days": 2, "lat": 31.2304, "lng": 121.4737, "radius_km": 1.0})]
+
+        self.assertIsNone(choose_required_intent(state, rules))
+
+    def test_monthly_visit_intent_still_occurs_after_required_day_count_if_not_satisfied(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 4 * 1440,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "reposition", "params": {"latitude": 31.2304, "longitude": 121.4737}},
+                        "position_after": {"lat": 31.2304, "lng": 121.4737},
+                        "simulation_end_time": "2026-03-01 05:00",
+                        "step_elapsed_minutes": 60,
+                    }
+                ]
+            },
+        )
+        rules = [_rule(RuleType.MONTHLY_VISIT_DAYS, {"required_days": 2, "lat": 31.2304, "lng": 121.4737, "radius_km": 1.0})]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "visit_target")
+        self.assertEqual(intent.action, "reposition")
+
+    def test_current_day_rest_credit_clips_wait_that_crossed_midnight(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 1440 + 30,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "wait", "params": {"duration_minutes": 90}},
+                        "step_elapsed_minutes": 90,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(state.recent_continuous_wait_minutes, 30)
+
+    def test_malformed_and_negative_wait_durations_do_not_crash_or_reduce_rest_credit(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 180,
+                "current_lat": 22.54,
+                "current_lng": 114.07,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {"action": {"action": "wait", "params": {"duration_minutes": 60}}, "step_elapsed_minutes": 60},
+                    {"action": {"action": "wait", "params": {"duration_minutes": -30}}, "step_elapsed_minutes": -30},
+                    {"action": {"action": "wait", "params": {"duration_minutes": "bad"}}, "step_elapsed_minutes": "bad"},
+                ]
+            },
+        )
+
+        self.assertEqual(state.recent_continuous_wait_minutes, 60)
+
 
 if __name__ == "__main__":
     unittest.main()
