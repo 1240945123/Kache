@@ -1,0 +1,20 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local virtual environments and tooling caches
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Competition data and generated outputs
+demo/server/data/
+demo/results/
+
+# Local secrets/config
+demo/server/config/config.json
+
+# Release archives and bulky local packages
+*.zip
