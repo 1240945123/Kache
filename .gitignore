@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 
 # Local virtual environments and tooling caches
+.worktrees/
 .venv/
 venv/
 .mypy_cache/
