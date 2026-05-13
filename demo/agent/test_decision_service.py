@@ -10,10 +10,11 @@ from model_decision_service import ModelDecisionService
 
 
 class FakeApi:
-    def __init__(self, *, status, cargo_items=None, history=None):
+    def __init__(self, *, status, cargo_items=None, history=None, model_response=None):
         self.status = status
         self.cargo_items = cargo_items or []
         self.history = history or {"records": []}
+        self.model_response = model_response
         self.query_count = 0
         self.model_count = 0
 
@@ -29,6 +30,8 @@ class FakeApi:
 
     def model_chat_completion(self, payload):
         self.model_count += 1
+        if self.model_response is not None:
+            return self.model_response
         raise AssertionError("model should not drive normal decisions")
 
 
@@ -45,12 +48,12 @@ def _status(**overrides):
     return base
 
 
-def _cargo(cargo_id="C1", category="普通货物", cargo_name=None):
+def _cargo(cargo_id="C1", category="普通货物", cargo_name=None, price=500.0):
     cargo = {
         "cargo_id": cargo_id,
         "category": category,
         "remove_time": "2026-03-01 23:59:59",
-        "price": 500.0,
+        "price": price,
         "cost_time_minutes": 100,
         "load_time": None,
         "truck_length": ["4.2米"],
@@ -91,6 +94,78 @@ class DecisionServiceTest(unittest.TestCase):
         action = ModelDecisionService(api).decide("DXXX")
 
         self.assertEqual(action["action"], "wait")
+
+    def test_required_cargo_restricts_candidates_before_scoring(self):
+        api = FakeApi(
+            status=_status(
+                simulation_progress_minutes=8 * 60,
+                preferences=["指定熟货源编号240646"],
+            ),
+            cargo_items=[
+                _cargo(cargo_id="OTHER", price=900.0),
+                _cargo(cargo_id="240646", price=300.0),
+            ],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action, {"action": "take_order", "params": {"cargo_id": "240646"}})
+
+    def test_required_cargo_not_visible_waits(self):
+        api = FakeApi(
+            status=_status(
+                simulation_progress_minutes=8 * 60,
+                preferences=["指定熟货源编号240646"],
+            ),
+            cargo_items=[_cargo(cargo_id="OTHER", price=900.0)],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action["action"], "wait")
+
+    def test_unenforced_hard_rule_from_model_fallback_waits(self):
+        api = FakeApi(
+            status=_status(
+                simulation_progress_minutes=8 * 60,
+                preferences=["必须按短信通知留在家中。"],
+            ),
+            cargo_items=[_cargo()],
+            model_response={
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                '{"rules":[{"rule_type":"stay_window","strength":"hard",'
+                                '"value":{"location":"home"},"source_text":"必须按短信通知留在家中。"}]}'
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action["action"], "wait")
+        self.assertEqual(api.model_count, 1)
+
+    def test_no_drive_window_with_unknown_strong_does_not_call_model_or_query_cargo(self):
+        api = FakeApi(
+            status=_status(
+                preferences=[
+                    "每天23点至次日6点不接单、不空车赶路。",
+                    "必须按短信通知留在家中。",
+                ],
+            ),
+            cargo_items=[_cargo()],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action["action"], "wait")
+        self.assertEqual(api.model_count, 0)
+        self.assertEqual(api.query_count, 0)
 
 
 if __name__ == "__main__":
