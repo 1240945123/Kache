@@ -8,8 +8,15 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
-import demo.agent.evaluate_results as evaluate_results
-from demo.agent.evaluate_results import build_experiment_summary, build_report, format_driver_timeline, format_report
+try:
+    import demo.agent.evaluate_results as evaluate_results
+except ModuleNotFoundError:
+    import evaluate_results
+
+build_experiment_summary = evaluate_results.build_experiment_summary
+build_report = evaluate_results.build_report
+format_driver_timeline = evaluate_results.format_driver_timeline
+format_report = evaluate_results.format_report
 
 
 class EvaluateResultsTest(unittest.TestCase):
