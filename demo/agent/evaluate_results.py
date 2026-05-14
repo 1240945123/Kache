@@ -44,14 +44,43 @@ def _action_counts(results_dir: Path, driver_id: str) -> Counter[str]:
     return counts
 
 
-def build_report(results_dir: Path, *, experiment_id: str) -> str:
+def build_experiment_summary(results_dir: Path, *, experiment_id: str) -> dict[str, Any]:
     monthly = _read_json(results_dir / f"monthly_income_{MONTH}.json")
     run_summary_path = results_dir / f"run_summary_{MONTH}.json"
     run_summary = _read_json(run_summary_path) if run_summary_path.exists() else {}
 
     summary = monthly.get("summary", {})
     driver_rows = monthly.get("drivers") or monthly.get("driver_rows") or monthly.get("rows") or []
+    drivers: list[dict[str, Any]] = []
+    for row in driver_rows:
+        driver = dict(row)
+        driver_id = str(driver.get("driver_id", ""))
+        driver["actions"] = dict(_action_counts(results_dir, driver_id))
+        drivers.append(driver)
 
+    return {
+        "experiment_id": experiment_id,
+        "results_dir": results_dir,
+        "summary": summary,
+        "run_summary": run_summary,
+        "drivers": drivers,
+    }
+
+
+def format_delta_section(experiment: dict[str, Any], baseline_path: Path | None) -> list[str]:
+    return []
+
+
+def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
+    return []
+
+
+def format_report(experiment: dict[str, Any]) -> str:
+    experiment_id = experiment["experiment_id"]
+    results_dir = experiment["results_dir"]
+    summary = experiment.get("summary", {})
+    run_summary = experiment.get("run_summary", {})
+    driver_rows = experiment.get("drivers", [])
     lines = [
         f"# Experiment {experiment_id}",
         "",
@@ -86,7 +115,7 @@ def build_report(results_dir: Path, *, experiment_id: str) -> str:
         income = row.get("income", {})
         if not isinstance(income, dict):
             income = {}
-        counts = _action_counts(results_dir, driver_id)
+        counts = row.get("actions", {})
         preference_check = row.get("preference_check", {})
         rules = preference_check.get("rules", []) if isinstance(preference_check, dict) else []
         action_text = ", ".join(f"{name}={count}" for name, count in sorted(counts.items()))
@@ -113,6 +142,17 @@ def build_report(results_dir: Path, *, experiment_id: str) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def build_report(
+    results_dir: Path,
+    *,
+    experiment_id: str,
+    baseline_path: Path | None = None,
+    timeline_driver_ids: list[str] | None = None,
+) -> str:
+    experiment = build_experiment_summary(results_dir, experiment_id=experiment_id)
+    return format_report(experiment)
 
 
 def main() -> None:

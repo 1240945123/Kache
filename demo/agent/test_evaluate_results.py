@@ -5,10 +5,54 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from evaluate_results import build_report
+from demo.agent.evaluate_results import build_experiment_summary, build_report
 
 
 class EvaluateResultsTest(unittest.TestCase):
+    def test_build_experiment_summary_extracts_structured_result_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results_dir = Path(tmp)
+            (results_dir / "monthly_income_202603.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {
+                            "total_net_income_all_drivers": 100.0,
+                            "total_token_usage": {"total_tokens": 5},
+                        },
+                        "drivers": [
+                            {
+                                "driver_id": "D001",
+                                "income": {},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (results_dir / "run_summary_202603.json").write_text(
+                json.dumps({"completed_steps": 42}),
+                encoding="utf-8",
+            )
+            (results_dir / "actions_202603_D001_sample.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps({"action": {"action": "take_order"}, "result": {"accepted": True}}),
+                        json.dumps({"action": {"action": "wait"}, "result": {}}),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            summary = build_experiment_summary(results_dir, experiment_id="unit-test")
+
+        self.assertEqual(summary["experiment_id"], "unit-test")
+        self.assertEqual(summary["summary"]["total_net_income_all_drivers"], 100.0)
+        self.assertEqual(summary["summary"]["total_token_usage"]["total_tokens"], 5)
+        self.assertEqual(summary["run_summary"]["completed_steps"], 42)
+        self.assertEqual(summary["drivers"][0]["driver_id"], "D001")
+        self.assertEqual(summary["drivers"][0]["actions"]["take_order"], 1)
+        self.assertEqual(summary["drivers"][0]["actions"]["wait"], 1)
+
     def test_build_report_includes_summary_drivers_and_action_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             results_dir = Path(tmp)
