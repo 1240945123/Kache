@@ -405,6 +405,46 @@ class EvaluateResultsTest(unittest.TestCase):
         self.assertIn("| driver_id | gross | cost | penalty | net | actions Δ |", section)
         self.assertIn("| D001 | +20.0 | +0.0 | -2.0 | +22.0 | take_order=-1.0, wait=+2.0 |", section)
 
+    def test_delta_reports_drivers_missing_from_current_or_baseline(self):
+        current = {
+            "summary": {},
+            "drivers": [
+                {
+                    "driver_id": "D001",
+                    "gross": 120.0,
+                    "cost": 20.0,
+                    "penalty": 3.0,
+                    "net": 97.0,
+                    "actions": {"wait": 1},
+                }
+            ],
+        }
+        baseline = {
+            "summary": {},
+            "drivers": [
+                {
+                    "driver_id": "D002",
+                    "gross": 90.0,
+                    "cost": 10.0,
+                    "penalty": 5.0,
+                    "net": 75.0,
+                    "actions": {"take_order": 2},
+                }
+            ],
+        }
+
+        delta = evaluate_results.compute_experiment_delta(current, baseline)
+
+        self.assertEqual(delta["missing_drivers"], {"current_only": ["D001"], "baseline_only": ["D002"]})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline_path = Path(tmp) / "baseline.json"
+            baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+            lines = evaluate_results.format_delta_section(current, baseline_path)
+
+        self.assertIn("- missing_drivers: current_only=D001; baseline_only=D002", "\n".join(lines))
+
     def test_main_writes_markdown_and_json_sidecar_and_passes_optional_args(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

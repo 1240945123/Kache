@@ -153,8 +153,14 @@ def compute_experiment_delta(current: dict[str, Any], baseline: dict[str, Any]) 
 
     current_drivers = rows_by_driver(current)
     baseline_drivers = rows_by_driver(baseline)
+    current_driver_ids = set(current_drivers)
+    baseline_driver_ids = set(baseline_drivers)
+    missing_drivers = {
+        "current_only": sorted(current_driver_ids - baseline_driver_ids),
+        "baseline_only": sorted(baseline_driver_ids - current_driver_ids),
+    }
     driver_deltas = []
-    for driver_id in sorted(set(current_drivers) | set(baseline_drivers)):
+    for driver_id in sorted(current_driver_ids | baseline_driver_ids):
         current_row = current_drivers.get(driver_id, {})
         baseline_row = baseline_drivers.get(driver_id, {})
         current_actions = current_row.get("actions", {})
@@ -183,6 +189,7 @@ def compute_experiment_delta(current: dict[str, Any], baseline: dict[str, Any]) 
         "summary": summary_delta,
         "run_summary": run_summary_delta,
         "drivers": driver_deltas,
+        "missing_drivers": missing_drivers,
     }
 
 
@@ -210,6 +217,18 @@ def format_delta_section(experiment: dict[str, Any], baseline_path: Path | None)
     for key in ("completed_steps", "simulate_time_seconds"):
         if key in delta["run_summary"]:
             lines.append(f"- {key}: {_signed(delta['run_summary'].get(key, 0.0))}")
+    missing_drivers = delta.get("missing_drivers", {})
+    if not isinstance(missing_drivers, dict):
+        missing_drivers = {}
+    current_only = missing_drivers.get("current_only", [])
+    baseline_only = missing_drivers.get("baseline_only", [])
+    if current_only or baseline_only:
+        lines.append(
+            "- missing_drivers: current_only={current_only}; baseline_only={baseline_only}".format(
+                current_only=", ".join(str(driver_id) for driver_id in current_only) or "none",
+                baseline_only=", ".join(str(driver_id) for driver_id in baseline_only) or "none",
+            )
+        )
 
     lines.extend(
         [
