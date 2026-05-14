@@ -9,7 +9,7 @@ from io import StringIO
 from pathlib import Path
 
 import demo.agent.evaluate_results as evaluate_results
-from demo.agent.evaluate_results import build_experiment_summary, build_report, format_report
+from demo.agent.evaluate_results import build_experiment_summary, build_report, format_driver_timeline, format_report
 
 
 class EvaluateResultsTest(unittest.TestCase):
@@ -236,6 +236,53 @@ class EvaluateResultsTest(unittest.TestCase):
         self.assertIn("completed_steps", report)
         self.assertIn("| D001 | 200.0 | 50.0 | 20.0 | 130.0 |", report)
         self.assertIn("take_order=1", report)
+
+    def test_format_driver_timeline_includes_selected_driver_action_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results_dir = Path(tmp)
+            (results_dir / "actions_202603_D009_sample.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "step": 1,
+                                "simulation_progress_minutes": 30,
+                                "simulation_end_time": "2026-03-01 00:30",
+                                "action": {"action": "wait", "duration_minutes": 30},
+                                "position_before": {"lat": 31.23, "lng": 121.47},
+                                "position_after": {"lat": 31.24, "lng": 121.48},
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "step": 2,
+                                "simulation_progress_minutes": 745,
+                                "simulation_end_time": "2026-03-01 12:25",
+                                "action": {
+                                    "action": "take_order",
+                                    "cargo_id": 220562,
+                                    "pickup_deadhead_km": 57.99,
+                                    "haul_distance_km": 49.14,
+                                },
+                                "result": {"accepted": True},
+                                "position_before": {"lat": 31.24, "lng": 121.48},
+                                "position_after": {"lat": 30.98, "lng": 120.72},
+                            }
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            timeline = "\n".join(format_driver_timeline(results_dir, "D009"))
+
+        self.assertIn("## Timeline D009", timeline)
+        self.assertIn("| 1 | 30 | 2026-03-01 00:30 | wait |", timeline)
+        self.assertIn("duration=30", timeline)
+        self.assertIn("| 2 | 745 | 2026-03-01 12:25 | take_order |", timeline)
+        self.assertIn("cargo=220562", timeline)
+        self.assertIn("deadhead=57.99", timeline)
+        self.assertIn("haul=49.14", timeline)
 
     def test_compute_experiment_delta_includes_summary_run_and_driver_deltas_sorted_by_regression(self):
         current = {

@@ -255,8 +255,86 @@ def format_delta_section(experiment: dict[str, Any], baseline_path: Path | None)
     return lines
 
 
+def _latest_action_file(results_dir: Path, driver_id: str) -> Path | None:
+    action_files = sorted(results_dir.glob(f"actions_{MONTH}_{driver_id}_*.jsonl"))
+    if not action_files:
+        return None
+    return action_files[-1]
+
+
+def _position_text(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    lat = value.get("lat", value.get("latitude"))
+    lng = value.get("lng", value.get("longitude"))
+    if lat in (None, "") or lng in (None, ""):
+        return ""
+    return f"({lat},{lng})"
+
+
+def _action_detail(record: dict[str, Any]) -> str:
+    action = record.get("action", {})
+    if not isinstance(action, dict):
+        action = {}
+    result = record.get("result", {})
+    if not isinstance(result, dict):
+        result = {}
+
+    detail_specs = (
+        ("cargo", action.get("cargo_id", record.get("cargo_id"))),
+        ("duration", action.get("duration_minutes", record.get("duration_minutes"))),
+        ("target", action.get("target", record.get("target"))),
+        ("accepted", result.get("accepted", record.get("accepted"))),
+        ("deadhead", action.get("pickup_deadhead_km", record.get("pickup_deadhead_km"))),
+        ("haul", action.get("haul_distance_km", record.get("haul_distance_km"))),
+    )
+    return ", ".join(f"{name}={value}" for name, value in detail_specs if value not in (None, ""))
+
+
 def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
-    return []
+    lines = [
+        "",
+        f"## Timeline {driver_id}",
+        "",
+    ]
+    action_file = _latest_action_file(results_dir, driver_id)
+    if action_file is None:
+        lines.append(f"- No action log found for {driver_id}")
+        return lines
+
+    lines.extend(
+        [
+            f"- Source action file: {action_file.name}",
+            "",
+            "| step | minute | wall_time | action | elapsed | before | after | details |",
+            "| ---: | ---: | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    with action_file.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            action = record.get("action", {})
+            if isinstance(action, dict):
+                action_name = action.get("action", "")
+            else:
+                action_name = action
+            lines.append(
+                "| {step} | {minute} | {wall_time} | {action} | {elapsed} | {before} | {after} | {details} |".format(
+                    step=record.get("step", ""),
+                    minute=record.get("simulation_progress_minutes", ""),
+                    wall_time=record.get("simulation_end_time", ""),
+                    action=action_name or "",
+                    elapsed=record.get("elapsed", record.get("elapsed_minutes", "")),
+                    before=_position_text(record.get("position_before")),
+                    after=_position_text(record.get("position_after")),
+                    details=_action_detail(record),
+                )
+            )
+    return lines
+
 
 
 def format_report(
