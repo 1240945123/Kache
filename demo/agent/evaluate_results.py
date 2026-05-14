@@ -53,10 +53,24 @@ def build_experiment_summary(results_dir: Path, *, experiment_id: str) -> dict[s
     driver_rows = monthly.get("drivers") or monthly.get("driver_rows") or monthly.get("rows") or []
     drivers: list[dict[str, Any]] = []
     for row in driver_rows:
-        driver = dict(row)
-        driver_id = str(driver.get("driver_id", ""))
-        driver["actions"] = dict(_action_counts(results_dir, driver_id))
-        drivers.append(driver)
+        driver_id = str(row.get("driver_id", ""))
+        income = row.get("income", {})
+        if not isinstance(income, dict):
+            income = {}
+        preference_check = row.get("preference_check", {})
+        rules = preference_check.get("rules", []) if isinstance(preference_check, dict) else []
+        drivers.append(
+            {
+                "driver_id": driver_id,
+                "gross": income.get("gross_income", ""),
+                "cost": income.get("cost", ""),
+                "penalty": income.get("preference_penalty", ""),
+                "net": income.get("net_income", ""),
+                "calculation_aborted": row.get("calculation_aborted", ""),
+                "rules": rules,
+                "actions": dict(sorted(_action_counts(results_dir, driver_id).items())),
+            }
+        )
 
     return {
         "experiment_id": experiment_id,
@@ -76,7 +90,12 @@ def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
     return []
 
 
-def format_report(experiment: dict[str, Any]) -> str:
+def format_report(
+    experiment: dict[str, Any],
+    *,
+    baseline_path: Path | None = None,
+    timeline_driver_ids: list[str] | None = None,
+) -> str:
     experiment_id = experiment["experiment_id"]
     results_dir = experiment["results_dir"]
     summary = experiment.get("summary", {})
@@ -113,25 +132,25 @@ def format_report(experiment: dict[str, Any]) -> str:
     )
     for row in driver_rows:
         driver_id = str(row.get("driver_id", ""))
-        income = row.get("income", {})
-        if not isinstance(income, dict):
-            income = {}
         counts = row.get("actions", {})
-        preference_check = row.get("preference_check", {})
-        rules = preference_check.get("rules", []) if isinstance(preference_check, dict) else []
+        rules = row.get("rules", [])
         action_text = ", ".join(f"{name}={count}" for name, count in sorted(counts.items()))
         lines.append(
             "| {driver_id} | {gross} | {cost} | {penalty} | {net} | {aborted} | {rules} | {actions} |".format(
                 driver_id=driver_id,
-                gross=income.get("gross_income", ""),
-                cost=income.get("cost", ""),
-                penalty=income.get("preference_penalty", ""),
-                net=income.get("net_income", ""),
+                gross=row.get("gross", ""),
+                cost=row.get("cost", ""),
+                penalty=row.get("penalty", ""),
+                net=row.get("net", ""),
                 aborted=row.get("calculation_aborted", ""),
                 rules=len(rules),
                 actions=action_text,
             )
         )
+
+    lines.extend(format_delta_section(experiment, baseline_path))
+    for driver_id in timeline_driver_ids or []:
+        lines.extend(format_driver_timeline(results_dir, driver_id))
 
     lines.extend(
         [
@@ -139,7 +158,7 @@ def format_report(experiment: dict[str, Any]) -> str:
             "## Notes",
             "",
             f"- Source results directory: {results_dir}",
-            f"- Generated at: {datetime.now().isoformat(timespec='seconds')}",
+            f"- Generated at: {experiment.get('generated_at', '')}",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -153,7 +172,7 @@ def build_report(
     timeline_driver_ids: list[str] | None = None,
 ) -> str:
     experiment = build_experiment_summary(results_dir, experiment_id=experiment_id)
-    return format_report(experiment)
+    return format_report(experiment, baseline_path=baseline_path, timeline_driver_ids=timeline_driver_ids)
 
 
 def main() -> None:
