@@ -214,18 +214,23 @@ def format_delta_section(experiment: dict[str, Any], baseline_path: Path | None)
     lines.extend(
         [
             "",
-            "| driver_id | gross | cost | penalty | net |",
-            "| --- | ---: | ---: | ---: | ---: |",
+            "| driver_id | gross | cost | penalty | net | actions Δ |",
+            "| --- | ---: | ---: | ---: | ---: | --- |",
         ]
     )
     for row in delta["drivers"]:
+        actions = row.get("actions", {})
+        if not isinstance(actions, dict):
+            actions = {}
+        action_text = ", ".join(f"{name}={_signed(_as_float(value))}" for name, value in sorted(actions.items()))
         lines.append(
-            "| {driver_id} | {gross} | {cost} | {penalty} | {net} |".format(
+            "| {driver_id} | {gross} | {cost} | {penalty} | {net} | {actions} |".format(
                 driver_id=row.get("driver_id", ""),
                 gross=_signed(row.get("gross", 0.0)),
                 cost=_signed(row.get("cost", 0.0)),
                 penalty=_signed(row.get("penalty", 0.0)),
                 net=_signed(row.get("net", 0.0)),
+                actions=action_text,
             )
         )
     return lines

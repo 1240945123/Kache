@@ -368,7 +368,7 @@ class EvaluateResultsTest(unittest.TestCase):
                     "cost": 20.0,
                     "penalty": 3.0,
                     "net": 97.0,
-                    "actions": {"take_order": 4},
+                    "actions": {"take_order": 4, "wait": 3},
                 }
             ],
         }
@@ -387,7 +387,7 @@ class EvaluateResultsTest(unittest.TestCase):
                     "cost": 20.0,
                     "penalty": 5.0,
                     "net": 75.0,
-                    "actions": {"take_order": 4},
+                    "actions": {"take_order": 5, "wait": 1},
                 }
             ],
         }
@@ -402,7 +402,8 @@ class EvaluateResultsTest(unittest.TestCase):
         self.assertIn("- total_net_income_all_drivers: +10.0", section)
         self.assertIn("- total_preference_penalty: -2.0", section)
         self.assertIn("- total_token_usage.total_tokens: +10.0", section)
-        self.assertIn("| D001 | +20.0 | +0.0 | -2.0 | +22.0 |", section)
+        self.assertIn("| driver_id | gross | cost | penalty | net | actions Δ |", section)
+        self.assertIn("| D001 | +20.0 | +0.0 | -2.0 | +22.0 | take_order=-1.0, wait=+2.0 |", section)
 
     def test_main_writes_markdown_and_json_sidecar_and_passes_optional_args(self):
         with tempfile.TemporaryDirectory() as tmp:
