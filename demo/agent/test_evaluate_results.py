@@ -246,9 +246,12 @@ class EvaluateResultsTest(unittest.TestCase):
                         json.dumps(
                             {
                                 "step": 1,
-                                "simulation_progress_minutes": 30,
-                                "simulation_end_time": "2026-03-01 00:30",
-                                "action": {"action": "wait", "duration_minutes": 30},
+                                "step_elapsed_minutes": 1.5,
+                                "action": {"action": "wait", "params": {"duration_minutes": 30}},
+                                "result": {
+                                    "simulation_progress_minutes": 30,
+                                    "simulation_end_time": "2026-03-01 00:30",
+                                },
                                 "position_before": {"lat": 31.23, "lng": 121.47},
                                 "position_after": {"lat": 31.24, "lng": 121.48},
                             }
@@ -256,15 +259,22 @@ class EvaluateResultsTest(unittest.TestCase):
                         json.dumps(
                             {
                                 "step": 2,
-                                "simulation_progress_minutes": 745,
-                                "simulation_end_time": "2026-03-01 12:25",
+                                "step_elapsed_minutes": 2.75,
                                 "action": {
                                     "action": "take_order",
-                                    "cargo_id": 220562,
+                                    "params": {
+                                        "cargo_id": 220562,
+                                        "target_lat": 30.98,
+                                        "target_lng": 120.72,
+                                    },
+                                },
+                                "result": {
+                                    "accepted": True,
+                                    "simulation_progress_minutes": 745,
+                                    "simulation_end_time": "2026-03-01 12:25",
                                     "pickup_deadhead_km": 57.99,
                                     "haul_distance_km": 49.14,
                                 },
-                                "result": {"accepted": True},
                                 "position_before": {"lat": 31.24, "lng": 121.48},
                                 "position_after": {"lat": 30.98, "lng": 120.72},
                             }
@@ -277,10 +287,12 @@ class EvaluateResultsTest(unittest.TestCase):
             timeline = "\n".join(format_driver_timeline(results_dir, "D009"))
 
         self.assertIn("## Timeline D009", timeline)
-        self.assertIn("| 1 | 30 | 2026-03-01 00:30 | wait |", timeline)
+        self.assertIn("| 1 | 30 | 2026-03-01 00:30 | wait | 1.5 |", timeline)
         self.assertIn("duration=30", timeline)
-        self.assertIn("| 2 | 745 | 2026-03-01 12:25 | take_order |", timeline)
+        self.assertIn("| 2 | 745 | 2026-03-01 12:25 | take_order | 2.75 |", timeline)
         self.assertIn("cargo=220562", timeline)
+        self.assertIn("target=(30.98,120.72)", timeline)
+        self.assertIn("accepted=True", timeline)
         self.assertIn("deadhead=57.99", timeline)
         self.assertIn("haul=49.14", timeline)
 

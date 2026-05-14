@@ -276,17 +276,26 @@ def _action_detail(record: dict[str, Any]) -> str:
     action = record.get("action", {})
     if not isinstance(action, dict):
         action = {}
+    params = action.get("params", {})
+    if not isinstance(params, dict):
+        params = {}
     result = record.get("result", {})
     if not isinstance(result, dict):
         result = {}
 
+    target = ""
+    target_lat = params.get("target_lat")
+    target_lng = params.get("target_lng")
+    if target_lat not in (None, "") and target_lng not in (None, ""):
+        target = f"({target_lat},{target_lng})"
+
     detail_specs = (
-        ("cargo", action.get("cargo_id", record.get("cargo_id"))),
-        ("duration", action.get("duration_minutes", record.get("duration_minutes"))),
-        ("target", action.get("target", record.get("target"))),
-        ("accepted", result.get("accepted", record.get("accepted"))),
-        ("deadhead", action.get("pickup_deadhead_km", record.get("pickup_deadhead_km"))),
-        ("haul", action.get("haul_distance_km", record.get("haul_distance_km"))),
+        ("cargo", params.get("cargo_id", result.get("cargo_id"))),
+        ("duration", params.get("duration_minutes")),
+        ("target", target),
+        ("accepted", result.get("accepted")),
+        ("deadhead", result.get("pickup_deadhead_km")),
+        ("haul", result.get("haul_distance_km")),
     )
     return ", ".join(f"{name}={value}" for name, value in detail_specs if value not in (None, ""))
 
@@ -321,13 +330,16 @@ def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
                 action_name = action.get("action", "")
             else:
                 action_name = action
+            result = record.get("result", {})
+            if not isinstance(result, dict):
+                result = {}
             lines.append(
                 "| {step} | {minute} | {wall_time} | {action} | {elapsed} | {before} | {after} | {details} |".format(
                     step=record.get("step", ""),
-                    minute=record.get("simulation_progress_minutes", ""),
-                    wall_time=record.get("simulation_end_time", ""),
+                    minute=result.get("simulation_progress_minutes", ""),
+                    wall_time=result.get("simulation_end_time", ""),
                     action=action_name or "",
-                    elapsed=record.get("elapsed", record.get("elapsed_minutes", "")),
+                    elapsed=record.get("step_elapsed_minutes", ""),
                     before=_position_text(record.get("position_before")),
                     after=_position_text(record.get("position_after")),
                     details=_action_detail(record),
