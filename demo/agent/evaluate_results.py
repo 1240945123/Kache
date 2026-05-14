@@ -51,14 +51,19 @@ def build_experiment_summary(results_dir: Path, *, experiment_id: str) -> dict[s
 
     summary = monthly.get("summary", {})
     driver_rows = monthly.get("drivers") or monthly.get("driver_rows") or monthly.get("rows") or []
+    if not isinstance(driver_rows, list):
+        driver_rows = []
     drivers: list[dict[str, Any]] = []
     for row in driver_rows:
+        if not isinstance(row, dict):
+            continue
         driver_id = str(row.get("driver_id", ""))
         income = row.get("income", {})
         if not isinstance(income, dict):
             income = {}
         preference_check = row.get("preference_check", {})
         rules = preference_check.get("rules", []) if isinstance(preference_check, dict) else []
+        rule_count = len(rules) if isinstance(rules, list) else 0
         drivers.append(
             {
                 "driver_id": driver_id,
@@ -67,7 +72,7 @@ def build_experiment_summary(results_dir: Path, *, experiment_id: str) -> dict[s
                 "penalty": income.get("preference_penalty", ""),
                 "net": income.get("net_income", ""),
                 "calculation_aborted": row.get("calculation_aborted", ""),
-                "rules": rules,
+                "rules": rule_count,
                 "actions": dict(sorted(_action_counts(results_dir, driver_id).items())),
             }
         )
@@ -133,7 +138,6 @@ def format_report(
     for row in driver_rows:
         driver_id = str(row.get("driver_id", ""))
         counts = row.get("actions", {})
-        rules = row.get("rules", [])
         action_text = ", ".join(f"{name}={count}" for name, count in sorted(counts.items()))
         lines.append(
             "| {driver_id} | {gross} | {cost} | {penalty} | {net} | {aborted} | {rules} | {actions} |".format(
@@ -143,7 +147,7 @@ def format_report(
                 penalty=row.get("penalty", ""),
                 net=row.get("net", ""),
                 aborted=row.get("calculation_aborted", ""),
-                rules=len(rules),
+                rules=row.get("rules", 0),
                 actions=action_text,
             )
         )

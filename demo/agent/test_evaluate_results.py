@@ -68,7 +68,7 @@ class EvaluateResultsTest(unittest.TestCase):
                 "penalty": 20.0,
                 "net": 130.0,
                 "calculation_aborted": False,
-                "rules": [{"rule": "sample"}],
+                "rules": 1,
                 "actions": {"take_order": 1, "wait": 1},
             },
         )
@@ -89,7 +89,7 @@ class EvaluateResultsTest(unittest.TestCase):
                         "penalty": 20.0,
                         "net": 130.0,
                         "calculation_aborted": False,
-                        "rules": [{"rule": "sample"}],
+                        "rules": 1,
                         "actions": {"take_order": 1, "wait": 1},
                     }
                 ],
@@ -98,6 +98,51 @@ class EvaluateResultsTest(unittest.TestCase):
 
         self.assertIn("| D001 | 200.0 | 50.0 | 20.0 | 130.0 | False | 1 |", report)
         self.assertIn("- Generated at: 2026-05-14T12:34:56", report)
+
+    def test_malformed_driver_rows_and_rules_do_not_crash_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results_dir = Path(tmp)
+            (results_dir / "monthly_income_202603.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {},
+                        "drivers": [
+                            "not-a-driver-row",
+                            {
+                                "driver_id": "D001",
+                                "income": {
+                                    "gross_income": 200.0,
+                                    "cost": 50.0,
+                                    "preference_penalty": 20.0,
+                                    "net_income": 130.0,
+                                },
+                                "calculation_aborted": False,
+                                "preference_check": {"rules": {"malformed": "rules"}},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = build_report(results_dir, experiment_id="unit-test")
+            summary = build_experiment_summary(results_dir, experiment_id="unit-test")
+
+        self.assertEqual(summary["drivers"][0]["rules"], 0)
+        self.assertIn("| D001 | 200.0 | 50.0 | 20.0 | 130.0 | False | 0 |", report)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            results_dir = Path(tmp)
+            (results_dir / "monthly_income_202603.json").write_text(
+                json.dumps({"summary": {}, "drivers": {"unexpected": "shape"}}),
+                encoding="utf-8",
+            )
+
+            report = build_report(results_dir, experiment_id="unit-test")
+            summary = build_experiment_summary(results_dir, experiment_id="unit-test")
+
+        self.assertEqual(summary["drivers"], [])
+        self.assertIn("## Drivers", report)
 
     def test_build_report_passes_optional_sections_to_formatter(self):
         with tempfile.TemporaryDirectory() as tmp:
