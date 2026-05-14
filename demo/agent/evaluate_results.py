@@ -284,8 +284,8 @@ def _action_detail(record: dict[str, Any]) -> str:
         result = {}
 
     target = ""
-    target_lat = params.get("target_lat")
-    target_lng = params.get("target_lng")
+    target_lat = params.get("target_lat", params.get("latitude"))
+    target_lng = params.get("target_lng", params.get("longitude"))
     if target_lat not in (None, "") and target_lng not in (None, ""):
         target = f"({target_lat},{target_lng})"
 
@@ -298,6 +298,13 @@ def _action_detail(record: dict[str, Any]) -> str:
         ("haul", result.get("haul_distance_km")),
     )
     return ", ".join(f"{name}={value}" for name, value in detail_specs if value not in (None, ""))
+
+
+def _wall_time(record: dict[str, Any], result: dict[str, Any]) -> Any:
+    return record.get(
+        "simulation_end_time",
+        result.get("simulation_wall_time", result.get("simulation_end_time", "")),
+    )
 
 
 def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
@@ -337,7 +344,7 @@ def format_driver_timeline(results_dir: Path, driver_id: str) -> list[str]:
                 "| {step} | {minute} | {wall_time} | {action} | {elapsed} | {before} | {after} | {details} |".format(
                     step=record.get("step", ""),
                     minute=result.get("simulation_progress_minutes", ""),
-                    wall_time=result.get("simulation_end_time", ""),
+                    wall_time=_wall_time(record, result),
                     action=action_name or "",
                     elapsed=record.get("step_elapsed_minutes", ""),
                     before=_position_text(record.get("position_before")),

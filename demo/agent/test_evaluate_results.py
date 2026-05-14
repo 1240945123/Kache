@@ -247,10 +247,10 @@ class EvaluateResultsTest(unittest.TestCase):
                             {
                                 "step": 1,
                                 "step_elapsed_minutes": 1.5,
+                                "simulation_end_time": "2026-03-01 00:30",
                                 "action": {"action": "wait", "params": {"duration_minutes": 30}},
                                 "result": {
                                     "simulation_progress_minutes": 30,
-                                    "simulation_end_time": "2026-03-01 00:30",
                                 },
                                 "position_before": {"lat": 31.23, "lng": 121.47},
                                 "position_after": {"lat": 31.24, "lng": 121.48},
@@ -260,6 +260,7 @@ class EvaluateResultsTest(unittest.TestCase):
                             {
                                 "step": 2,
                                 "step_elapsed_minutes": 2.75,
+                                "simulation_end_time": "2026-03-01 12:25",
                                 "action": {
                                     "action": "take_order",
                                     "params": {
@@ -271,12 +272,25 @@ class EvaluateResultsTest(unittest.TestCase):
                                 "result": {
                                     "accepted": True,
                                     "simulation_progress_minutes": 745,
-                                    "simulation_end_time": "2026-03-01 12:25",
                                     "pickup_deadhead_km": 57.99,
                                     "haul_distance_km": 49.14,
                                 },
                                 "position_before": {"lat": 31.24, "lng": 121.48},
                                 "position_after": {"lat": 30.98, "lng": 120.72},
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "step": 3,
+                                "step_elapsed_minutes": 12,
+                                "simulation_end_time": "2026-03-01 12:37",
+                                "action": {
+                                    "action": "reposition",
+                                    "params": {"latitude": 23.1, "longitude": 113.2},
+                                },
+                                "result": {"simulation_progress_minutes": 757},
+                                "position_before": {"lat": 30.98, "lng": 120.72},
+                                "position_after": {"lat": 23.1, "lng": 113.2},
                             }
                         ),
                     ]
@@ -295,6 +309,8 @@ class EvaluateResultsTest(unittest.TestCase):
         self.assertIn("accepted=True", timeline)
         self.assertIn("deadhead=57.99", timeline)
         self.assertIn("haul=49.14", timeline)
+        self.assertIn("| 3 | 757 | 2026-03-01 12:37 | reposition | 12 |", timeline)
+        self.assertIn("target=(23.1,113.2)", timeline)
 
     def test_compute_experiment_delta_includes_summary_run_and_driver_deltas_sorted_by_regression(self):
         current = {
