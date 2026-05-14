@@ -46,6 +46,8 @@ class EvaluateResultsTest(unittest.TestCase):
             summary = build_experiment_summary(results_dir, experiment_id="unit-test")
 
         self.assertEqual(summary["experiment_id"], "unit-test")
+        self.assertIsInstance(summary["generated_at"], str)
+        self.assertTrue(summary["generated_at"])
         self.assertEqual(summary["summary"]["total_net_income_all_drivers"], 100.0)
         self.assertEqual(summary["summary"]["total_token_usage"]["total_tokens"], 5)
         self.assertEqual(summary["run_summary"]["completed_steps"], 42)

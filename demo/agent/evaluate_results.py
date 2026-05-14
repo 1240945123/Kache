@@ -60,6 +60,7 @@ def build_experiment_summary(results_dir: Path, *, experiment_id: str) -> dict[s
 
     return {
         "experiment_id": experiment_id,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
         "results_dir": results_dir,
         "summary": summary,
         "run_summary": run_summary,
