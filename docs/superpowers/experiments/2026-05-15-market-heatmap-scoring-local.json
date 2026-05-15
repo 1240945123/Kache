@@ -1,0 +1,189 @@
+{
+  "drivers": [
+    {
+      "actions": {
+        "accepted_false": 3,
+        "take_order": 64,
+        "wait": 41
+      },
+      "calculation_aborted": false,
+      "cost": 4112.22,
+      "driver_id": "D001",
+      "gross": 18534.1,
+      "net": 11421.88,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "take_order": 66,
+        "wait": 11
+      },
+      "calculation_aborted": false,
+      "cost": 11308.05,
+      "driver_id": "D002",
+      "gross": 40735.43,
+      "net": 24227.38,
+      "penalty": 5200.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "take_order": 6,
+        "wait": 923
+      },
+      "calculation_aborted": false,
+      "cost": 1032.3,
+      "driver_id": "D003",
+      "gross": 3121.92,
+      "net": 1489.62,
+      "penalty": 600.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "take_order": 73,
+        "wait": 19
+      },
+      "calculation_aborted": false,
+      "cost": 13006.59,
+      "driver_id": "D004",
+      "gross": 45482.7,
+      "net": 29476.11,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 75,
+        "wait": 30
+      },
+      "calculation_aborted": false,
+      "cost": 9057.09,
+      "driver_id": "D005",
+      "gross": 36886.03,
+      "net": 22228.94,
+      "penalty": 5600.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "take_order": 64,
+        "wait": 26
+      },
+      "calculation_aborted": false,
+      "cost": 10281.9,
+      "driver_id": "D006",
+      "gross": 35633.38,
+      "net": 19751.48,
+      "penalty": 5600.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "take_order": 72,
+        "wait": 25
+      },
+      "calculation_aborted": false,
+      "cost": 13059.54,
+      "driver_id": "D007",
+      "gross": 48252.03,
+      "net": 21192.49,
+      "penalty": 14000.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 74,
+        "wait": 4
+      },
+      "calculation_aborted": false,
+      "cost": 14157.52,
+      "driver_id": "D008",
+      "gross": 47562.94,
+      "net": 23405.41,
+      "penalty": 10000.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "reposition": 9,
+        "take_order": 78,
+        "wait": 56
+      },
+      "calculation_aborted": false,
+      "cost": 13421.09,
+      "driver_id": "D009",
+      "gross": 45314.27,
+      "net": 5793.18,
+      "penalty": 26100.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "reposition": 7,
+        "take_order": 65,
+        "wait": 18
+      },
+      "calculation_aborted": false,
+      "cost": 13060.24,
+      "driver_id": "D010",
+      "gross": 41264.97,
+      "net": 19534.72,
+      "penalty": 8670.0,
+      "rules": 4
+    }
+  ],
+  "experiment_id": "2026-05-15-market-heatmap-scoring-local",
+  "generated_at": "2026-05-15T10:57:39",
+  "results_dir": "..\\results",
+  "run_summary": {
+    "completed_steps": 1806,
+    "driver_completed_steps": {
+      "D001": 105,
+      "D002": 77,
+      "D003": 929,
+      "D004": 92,
+      "D005": 105,
+      "D006": 90,
+      "D007": 97,
+      "D008": 78,
+      "D009": 143,
+      "D010": 90
+    },
+    "driver_result_files": {
+      "D001": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D001_20260515_105700.jsonl",
+      "D002": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D002_20260515_105700.jsonl",
+      "D003": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D003_20260515_105700.jsonl",
+      "D004": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D004_20260515_105700.jsonl",
+      "D005": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D005_20260515_105700.jsonl",
+      "D006": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D006_20260515_105700.jsonl",
+      "D007": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D007_20260515_105700.jsonl",
+      "D008": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D008_20260515_105700.jsonl",
+      "D009": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D009_20260515_105700.jsonl",
+      "D010": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D010_20260515_105700.jsonl"
+    },
+    "month": "2026-03",
+    "remaining_cargo_count": 16879,
+    "simulate_time_seconds": 235.48,
+    "simulation_duration_days": 30
+  },
+  "summary": {
+    "failed_driver_count": 0,
+    "failed_drivers": {},
+    "total_net_income_all_drivers": 178521.21,
+    "total_preference_penalty": 81770.0,
+    "total_token_usage": {
+      "completion_tokens": 0,
+      "prompt_tokens": 0,
+      "reasoning_tokens": 0,
+      "total_tokens": 0
+    }
+  }
+}
