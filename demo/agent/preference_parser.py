@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
+from datetime import datetime
 from functools import lru_cache
 from typing import Any, Callable, Iterable
 
@@ -9,6 +10,8 @@ if __package__:
     from .preference_rules import PreferenceRule, RuleStrength, RuleType
 else:
     from preference_rules import PreferenceRule, RuleStrength, RuleType
+
+SIMULATION_EPOCH = datetime(2026, 3, 1, 0, 0, 0)
 
 
 _STRONG_UNKNOWN_MARKERS = (
@@ -235,6 +238,8 @@ def _coerce_rule_strength(value: Any, default: RuleStrength) -> RuleStrength:
 
 
 def _parse_cargo_categories(text: str, strength: RuleStrength) -> list[tuple[int, PreferenceRule]]:
+    if "指定熟货源编号" in text:
+        return []
     if not any(word in text for word in ("不接", "禁止", "不要", "不拉", "避免")):
         return []
     categories = [(match.start(), match.group(1).strip()) for match in re.finditer(r"[“\"'「]([^”\"'」]+)[”\"'」]", text)]
@@ -627,15 +632,34 @@ def _parse_required_cargo(text: str, strength: RuleStrength) -> tuple[int, Prefe
     match = re.search(r"指定熟货源编号\s*([A-Za-z0-9_-]+)", text)
     if not match:
         return None
+    value: dict[str, Any] = {"cargo_id": match.group(1)}
+    pickup_match = re.search(
+        r"装货地.*?[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)]",
+        text,
+    )
+    if pickup_match:
+        value["pickup_lat"] = float(pickup_match.group(1))
+        value["pickup_lng"] = float(pickup_match.group(2))
+    available_match = re.search(
+        r"上架时间\s*[:：]\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})",
+        text,
+    )
+    if available_match:
+        value["available_minute"] = _wall_time_to_simulation_minute(available_match.group(1))
     return (
         match.start(),
         PreferenceRule(
             RuleType.REQUIRED_CARGO,
             strength,
-            {"cargo_id": match.group(1)},
+            value,
             text,
         ),
     )
+
+
+def _wall_time_to_simulation_minute(value: str) -> int:
+    dt = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%S")
+    return int((dt - SIMULATION_EPOCH).total_seconds() // 60)
 
 
 def _distance_number(value: str) -> float:

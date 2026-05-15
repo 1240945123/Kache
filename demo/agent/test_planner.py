@@ -464,6 +464,64 @@ class PlannerTest(unittest.TestCase):
         self.assertEqual(intent.action, "wait")
         self.assertEqual(intent.params, {"duration_minutes": (12 * 24 * 60 + 22 * 60) - state.current_minute})
 
+    def test_required_cargo_repositions_to_pickup_when_launch_window_is_near(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 2 * 24 * 60 + 10 * 60,
+                "current_lat": 23.12,
+                "current_lng": 113.28,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [
+            _rule(
+                RuleType.REQUIRED_CARGO,
+                {
+                    "cargo_id": "REQ-77",
+                    "pickup_lat": 24.81,
+                    "pickup_lng": 113.58,
+                    "available_minute": 2 * 24 * 60 + 14 * 60 + 43,
+                },
+            )
+        ]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "required_cargo_pickup")
+        self.assertEqual(intent.action, "reposition")
+        self.assertEqual(intent.params, {"latitude": 24.81, "longitude": 113.58})
+
+    def test_required_cargo_waits_near_pickup_until_available(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 2 * 24 * 60 + 14 * 60,
+                "current_lat": 24.81,
+                "current_lng": 113.58,
+                "completed_order_count": 0,
+            },
+            {"records": []},
+        )
+        rules = [
+            _rule(
+                RuleType.REQUIRED_CARGO,
+                {
+                    "cargo_id": "REQ-77",
+                    "pickup_lat": 24.81,
+                    "pickup_lng": 113.58,
+                    "available_minute": 2 * 24 * 60 + 14 * 60 + 43,
+                },
+            )
+        ]
+
+        intent = choose_required_intent(state, rules)
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "required_cargo_wait")
+        self.assertEqual(intent.action, "wait")
+        self.assertEqual(intent.params, {"duration_minutes": 30})
+
     def test_current_day_rest_credit_clips_wait_that_crossed_midnight(self):
         state = build_planner_state(
             {

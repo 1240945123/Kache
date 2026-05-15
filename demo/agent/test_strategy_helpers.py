@@ -77,6 +77,32 @@ class StrategyHelpersTest(unittest.TestCase):
         ranked = filter_and_rank_candidates([late], _status(simulation_progress_minutes=1300), horizon_minutes=1440)
         self.assertEqual(ranked, [])
 
+    def test_candidate_over_default_total_duration_limit_is_filtered(self):
+        long_order = _item(
+            cargo_id="LONG",
+            cost_time_minutes=721,
+            load_time=None,
+            remove_time="2026-03-02 23:59:59",
+            price=2000.0,
+        )
+
+        ranked = filter_and_rank_candidates([long_order], _status())
+
+        self.assertEqual(ranked, [])
+
+    def test_required_mode_allows_candidate_over_total_duration_limit(self):
+        long_order = _item(
+            cargo_id="LONG",
+            cost_time_minutes=721,
+            load_time=None,
+            remove_time="2026-03-02 23:59:59",
+            price=2000.0,
+        )
+
+        ranked = filter_and_rank_candidates([long_order], _status(), max_total_order_minutes=None)
+
+        self.assertEqual([candidate.cargo_id for candidate in ranked], ["LONG"])
+
     def test_candidates_rank_by_rough_value(self):
         low = _item(cargo_id="LOW", price=300.0)
         high = _item(cargo_id="HIGH", price=800.0)

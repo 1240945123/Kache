@@ -113,6 +113,7 @@ def build_candidate(
     speed_km_per_hour: float = DEFAULT_SPEED_KM_PER_HOUR,
     cost_per_km: float = DEFAULT_COST_PER_KM,
     horizon_minutes: int | None = None,
+    max_total_order_minutes: int | None = MAX_TOTAL_ORDER_MINUTES,
 ) -> Candidate | None:
     try:
         cargo = item.get("cargo")
@@ -162,7 +163,7 @@ def build_candidate(
     if effective_horizon is not None and estimated_finish_minute > effective_horizon:
         return None
     total_order_minutes = estimated_finish_minute - current_minute
-    if total_order_minutes > MAX_TOTAL_ORDER_MINUTES:
+    if max_total_order_minutes is not None and total_order_minutes > max_total_order_minutes:
         return None
     haul_distance_km = haversine_km(start_lat, start_lng, end_lat, end_lng)
     rough_cost = (pickup_distance_km + haul_distance_km) * cost_per_km
@@ -193,11 +194,20 @@ def filter_and_rank_candidates(
     *,
     limit: int = DEFAULT_TOP_CANDIDATE_LIMIT,
     horizon_minutes: int | None = None,
+    max_total_order_minutes: int | None = MAX_TOTAL_ORDER_MINUTES,
 ) -> list[Candidate]:
     candidates = [
         candidate
         for item in items
-        if (candidate := build_candidate(item, status, horizon_minutes=horizon_minutes)) is not None
+        if (
+            candidate := build_candidate(
+                item,
+                status,
+                horizon_minutes=horizon_minutes,
+                max_total_order_minutes=max_total_order_minutes,
+            )
+        )
+        is not None
     ]
     candidates.sort(
         key=lambda c: (

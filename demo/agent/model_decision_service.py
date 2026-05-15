@@ -93,7 +93,12 @@ class ModelDecisionService:
         cargo_by_id = self._cargo_by_id(items)
         required_cargo_ids = self._required_cargo_ids(rules)
         candidate_limit = len(items) if required_cargo_ids else 10
-        candidates = filter_and_rank_candidates(items, status, limit=candidate_limit)
+        candidates = filter_and_rank_candidates(
+            items,
+            status,
+            limit=candidate_limit,
+            max_total_order_minutes=None if required_cargo_ids else 12 * 60,
+        )
         allowed_candidates = filter_candidates(candidates, rules, cargo_by_id=cargo_by_id)
         if self._has_monthly_deadhead_limit(rules):
             if history is None:
@@ -131,6 +136,7 @@ class ModelDecisionService:
             RuleType.MONTHLY_NO_ORDER_DAYS,
             RuleType.MONTHLY_OFF_DAYS,
             RuleType.MONTHLY_VISIT_DAYS,
+            RuleType.REQUIRED_CARGO,
             RuleType.SEQUENCE_TASK,
         }
         for rule in rules:

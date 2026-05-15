@@ -310,6 +310,30 @@ class PreferenceParserTest(unittest.TestCase):
         self.assertEqual(rule.strength, RuleStrength.HARD)
         self.assertEqual(rule.value, {"cargo_id": "240646"})
 
+    def test_required_cargo_metadata_from_real_style_text(self):
+        text = (
+            "\u3010\u4e34\u65f6\u7ea6\u5b9a\u00b7\u719f\u8d27\u3011"
+            "\u6307\u5b9a\u719f\u8d27\u6e90\u7f16\u53f7REQ-77"
+            "\uff08\u54c1\u7c7b\u300c\u666e\u901a\u8d27\u7269\u300d\uff09\uff1a"
+            "\u88c5\u8d27\u5730\uff1a\u67d0\u5e02\u67d0\u533a\uff0824.81\uff0c113.58\uff09\uff1b"
+            "\u4e0a\u67b6\u65f6\u95f4\uff1a2026-03-03 14:43:36\uff1b"
+            "\u4e0d\u63a5\u5219\u7f5a10000\u5143\u3002"
+        )
+
+        rule = _only_rule(text)
+
+        self.assertEqual(rule.rule_type, RuleType.REQUIRED_CARGO)
+        self.assertEqual(rule.strength, RuleStrength.HARD)
+        self.assertEqual(
+            rule.value,
+            {
+                "cargo_id": "REQ-77",
+                "pickup_lat": 24.81,
+                "pickup_lng": 113.58,
+                "available_minute": 2 * 24 * 60 + 14 * 60 + 43,
+            },
+        )
+
     def test_unparsed_strong_marker_becomes_unknown_strong(self):
         rule = _only_rule("必须按短信通知留在家中。")
 

@@ -6,13 +6,16 @@ from typing import Any
 
 if __package__:
     from .preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
-    from .strategy_helpers import haversine_km
+    from .strategy_helpers import haversine_km, movement_minutes
 else:
     from preference_rules import PlannedIntent, PreferenceRule, RuleStrength, RuleType
-    from strategy_helpers import haversine_km
+    from strategy_helpers import haversine_km, movement_minutes
 
 MINUTES_PER_DAY = 24 * 60
 SIMULATION_EPOCH = datetime(2026, 3, 1, 0, 0)
+REQUIRED_CARGO_RADIUS_KM = 3.0
+REQUIRED_CARGO_LEAD_BUFFER_MINUTES = 180
+REQUIRED_CARGO_WAIT_CHUNK_MINUTES = 30
 
 
 @dataclass(frozen=True)
@@ -314,10 +317,51 @@ def _sequence_task_intent(state: PlannerState, rule: PreferenceRule) -> PlannedI
     )
 
 
+def _required_cargo_intent(state: PlannerState, rule: PreferenceRule) -> PlannedIntent | None:
+    try:
+        pickup_lat = float(rule.value["pickup_lat"])
+        pickup_lng = float(rule.value["pickup_lng"])
+        available_minute = int(rule.value["available_minute"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if state.current_minute >= available_minute:
+        return None
+
+    distance_km = haversine_km(state.current_lat, state.current_lng, pickup_lat, pickup_lng)
+    minutes_until_available = available_minute - state.current_minute
+    if distance_km <= REQUIRED_CARGO_RADIUS_KM:
+        return PlannedIntent(
+            intent_type="required_cargo_wait",
+            action="wait",
+            params={"duration_minutes": min(REQUIRED_CARGO_WAIT_CHUNK_MINUTES, max(1, minutes_until_available))},
+            reason=rule.source_text,
+            priority=110,
+            metadata={"rule_type": rule.rule_type.value},
+        )
+
+    travel_minutes = movement_minutes(distance_km)
+    if minutes_until_available <= travel_minutes + REQUIRED_CARGO_LEAD_BUFFER_MINUTES:
+        return PlannedIntent(
+            intent_type="required_cargo_pickup",
+            action="reposition",
+            params={"latitude": pickup_lat, "longitude": pickup_lng},
+            reason=rule.source_text,
+            priority=110,
+            metadata={"rule_type": rule.rule_type.value},
+        )
+    return None
+
+
 def choose_required_intent(state: PlannerState, rules: list[PreferenceRule]) -> PlannedIntent | None:
     for rule in rules:
         if _is_hard(rule) and rule.rule_type == RuleType.SEQUENCE_TASK:
             intent = _sequence_task_intent(state, rule)
+            if intent is not None:
+                return intent
+
+    for rule in rules:
+        if _is_hard(rule) and rule.rule_type == RuleType.REQUIRED_CARGO:
+            intent = _required_cargo_intent(state, rule)
             if intent is not None:
                 return intent
 

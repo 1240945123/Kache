@@ -142,6 +142,41 @@ class DecisionServiceTest(unittest.TestCase):
 
         self.assertEqual(action["action"], "wait")
 
+    def test_required_cargo_with_metadata_repositions_before_query(self):
+        required = (
+            "\u6307\u5b9a\u719f\u8d27\u6e90\u7f16\u53f7REQ-77\uff1b"
+            "\u88c5\u8d27\u5730\uff0824.81\uff0c113.58\uff09\uff1b"
+            "\u4e0a\u67b6\u65f6\u95f4\uff1a2026-03-03 14:43:36"
+        )
+        api = FakeApi(
+            status=_status(
+                simulation_progress_minutes=2 * 24 * 60 + 10 * 60,
+                current_lat=23.12,
+                current_lng=113.28,
+                preferences=[required],
+            ),
+            cargo_items=[_cargo(cargo_id="OTHER", price=900.0)],
+        )
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action, {"action": "reposition", "params": {"latitude": 24.81, "longitude": 113.58}})
+        self.assertEqual(api.query_count, 0)
+
+    def test_required_cargo_can_exceed_normal_total_duration_limit(self):
+        required = "\u6307\u5b9a\u719f\u8d27\u6e90\u7f16\u53f7REQ-77"
+        api = FakeApi(
+            status=_status(simulation_progress_minutes=8 * 60, preferences=[required]),
+            cargo_items=[
+                _cargo(cargo_id="REQ-77", price=2000.0, remove_time="2026-03-02 23:59:59"),
+            ],
+        )
+        api.cargo_items[0]["cargo"]["cost_time_minutes"] = 721
+
+        action = ModelDecisionService(api).decide("DXXX")
+
+        self.assertEqual(action, {"action": "take_order", "params": {"cargo_id": "REQ-77"}})
+
     def test_required_cargo_is_found_before_top_candidate_truncation(self):
         required = "\u6307\u5b9a\u719f\u8d27\u6e90\u7f16\u53f7240646"
         expensive = [_cargo(cargo_id=f"TOP{i}", price=1000.0 + i) for i in range(12)]
