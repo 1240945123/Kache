@@ -1,0 +1,192 @@
+{
+  "drivers": [
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 64,
+        "wait": 42
+      },
+      "calculation_aborted": false,
+      "cost": 4220.05,
+      "driver_id": "D001",
+      "gross": 18540.87,
+      "net": 11320.81,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 67,
+        "wait": 13
+      },
+      "calculation_aborted": false,
+      "cost": 11109.82,
+      "driver_id": "D002",
+      "gross": 39662.3,
+      "net": 23352.48,
+      "penalty": 5200.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 11,
+        "wait": 885
+      },
+      "calculation_aborted": false,
+      "cost": 1082.52,
+      "driver_id": "D003",
+      "gross": 3527.8,
+      "net": 2045.28,
+      "penalty": 400.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 78,
+        "wait": 21
+      },
+      "calculation_aborted": false,
+      "cost": 12783.52,
+      "driver_id": "D004",
+      "gross": 44738.45,
+      "net": 28954.92,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 3,
+        "take_order": 88,
+        "wait": 21
+      },
+      "calculation_aborted": false,
+      "cost": 10475.6,
+      "driver_id": "D005",
+      "gross": 41639.94,
+      "net": 25564.34,
+      "penalty": 5600.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "take_order": 64,
+        "wait": 26
+      },
+      "calculation_aborted": false,
+      "cost": 10281.9,
+      "driver_id": "D006",
+      "gross": 35633.38,
+      "net": 19751.48,
+      "penalty": 5600.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 8,
+        "take_order": 89,
+        "wait": 19
+      },
+      "calculation_aborted": false,
+      "cost": 13219.01,
+      "driver_id": "D007",
+      "gross": 46830.21,
+      "net": 19611.21,
+      "penalty": 14000.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 4,
+        "take_order": 77,
+        "wait": 4
+      },
+      "calculation_aborted": false,
+      "cost": 14778.43,
+      "driver_id": "D008",
+      "gross": 48636.07,
+      "net": 24257.63,
+      "penalty": 9600.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "reposition": 4,
+        "take_order": 78,
+        "wait": 55
+      },
+      "calculation_aborted": false,
+      "cost": 13790.85,
+      "driver_id": "D009",
+      "gross": 47918.6,
+      "net": 8027.75,
+      "penalty": 26100.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 3,
+        "reposition": 7,
+        "take_order": 69,
+        "wait": 11
+      },
+      "calculation_aborted": false,
+      "cost": 12179.53,
+      "driver_id": "D010",
+      "gross": 40527.17,
+      "net": 19677.64,
+      "penalty": 8670.0,
+      "rules": 4
+    }
+  ],
+  "experiment_id": "2026-05-15-learning-to-rank-reranker-rejected",
+  "generated_at": "2026-05-15T18:42:21",
+  "results_dir": "..\\results",
+  "run_summary": {
+    "completed_steps": 1793,
+    "driver_completed_steps": {
+      "D001": 106,
+      "D002": 80,
+      "D003": 896,
+      "D004": 99,
+      "D005": 109,
+      "D006": 90,
+      "D007": 108,
+      "D008": 81,
+      "D009": 137,
+      "D010": 87
+    },
+    "driver_result_files": {
+      "D001": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D001_20260515_184148.jsonl",
+      "D002": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D002_20260515_184148.jsonl",
+      "D003": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D003_20260515_184148.jsonl",
+      "D004": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D004_20260515_184148.jsonl",
+      "D005": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D005_20260515_184148.jsonl",
+      "D006": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D006_20260515_184148.jsonl",
+      "D007": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D007_20260515_184148.jsonl",
+      "D008": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D008_20260515_184148.jsonl",
+      "D009": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D009_20260515_184148.jsonl",
+      "D010": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D010_20260515_184148.jsonl"
+    },
+    "month": "2026-03",
+    "remaining_cargo_count": 16744,
+    "simulate_time_seconds": 271.42,
+    "simulation_duration_days": 30
+  },
+  "summary": {
+    "failed_driver_count": 0,
+    "failed_drivers": {},
+    "total_net_income_all_drivers": 182563.54,
+    "total_preference_penalty": 81170.0,
+    "total_token_usage": {
+      "completion_tokens": 0,
+      "prompt_tokens": 0,
+      "reasoning_tokens": 0,
+      "total_tokens": 0
+    }
+  }
+}
