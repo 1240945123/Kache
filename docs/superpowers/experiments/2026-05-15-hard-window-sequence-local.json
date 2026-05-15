@@ -1,0 +1,190 @@
+{
+  "drivers": [
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 63,
+        "wait": 41
+      },
+      "calculation_aborted": false,
+      "cost": 4100.41,
+      "driver_id": "D001",
+      "gross": 18407.69,
+      "net": 11307.27,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 5,
+        "take_order": 61,
+        "wait": 21
+      },
+      "calculation_aborted": false,
+      "cost": 12886.95,
+      "driver_id": "D002",
+      "gross": 38418.66,
+      "net": 20331.71,
+      "penalty": 5200.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "take_order": 6,
+        "wait": 923
+      },
+      "calculation_aborted": false,
+      "cost": 1032.3,
+      "driver_id": "D003",
+      "gross": 3121.92,
+      "net": 1489.62,
+      "penalty": 600.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "take_order": 69,
+        "wait": 16
+      },
+      "calculation_aborted": false,
+      "cost": 15795.37,
+      "driver_id": "D004",
+      "gross": 48116.94,
+      "net": 29321.57,
+      "penalty": 3000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 79,
+        "wait": 27
+      },
+      "calculation_aborted": false,
+      "cost": 9996.76,
+      "driver_id": "D005",
+      "gross": 40533.94,
+      "net": 24537.17,
+      "penalty": 6000.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 4,
+        "take_order": 67,
+        "wait": 26
+      },
+      "calculation_aborted": false,
+      "cost": 11228.97,
+      "driver_id": "D006",
+      "gross": 36141.67,
+      "net": 19512.7,
+      "penalty": 5400.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "take_order": 65,
+        "wait": 26
+      },
+      "calculation_aborted": false,
+      "cost": 13209.62,
+      "driver_id": "D007",
+      "gross": 42924.14,
+      "net": 15214.53,
+      "penalty": 14500.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 2,
+        "take_order": 71,
+        "wait": 43
+      },
+      "calculation_aborted": false,
+      "cost": 15523.66,
+      "driver_id": "D008",
+      "gross": 47922.17,
+      "net": 23598.51,
+      "penalty": 8800.0,
+      "rules": 4
+    },
+    {
+      "actions": {
+        "accepted_false": 4,
+        "reposition": 9,
+        "take_order": 75,
+        "wait": 74
+      },
+      "calculation_aborted": false,
+      "cost": 16786.11,
+      "driver_id": "D009",
+      "gross": 49225.78,
+      "net": -3660.33,
+      "penalty": 36100.0,
+      "rules": 3
+    },
+    {
+      "actions": {
+        "accepted_false": 1,
+        "reposition": 7,
+        "take_order": 64,
+        "wait": 10
+      },
+      "calculation_aborted": false,
+      "cost": 13720.01,
+      "driver_id": "D010",
+      "gross": 43999.84,
+      "net": 22319.83,
+      "penalty": 7960.0,
+      "rules": 4
+    }
+  ],
+  "experiment_id": "2026-05-15-hard-window-sequence-local",
+  "generated_at": "2026-05-15T08:58:59",
+  "results_dir": "..\\results",
+  "run_summary": {
+    "completed_steps": 1843,
+    "driver_completed_steps": {
+      "D001": 104,
+      "D002": 82,
+      "D003": 929,
+      "D004": 85,
+      "D005": 106,
+      "D006": 93,
+      "D007": 91,
+      "D008": 114,
+      "D009": 158,
+      "D010": 81
+    },
+    "driver_result_files": {
+      "D001": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D001_20260515_085835.jsonl",
+      "D002": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D002_20260515_085835.jsonl",
+      "D003": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D003_20260515_085835.jsonl",
+      "D004": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D004_20260515_085835.jsonl",
+      "D005": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D005_20260515_085835.jsonl",
+      "D006": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D006_20260515_085835.jsonl",
+      "D007": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D007_20260515_085835.jsonl",
+      "D008": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D008_20260515_085835.jsonl",
+      "D009": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D009_20260515_085835.jsonl",
+      "D010": "E:\\school\\KACHE\\.worktrees\\layered-preference-strategy\\demo\\results\\actions_202603_D010_20260515_085835.jsonl"
+    },
+    "month": "2026-03",
+    "remaining_cargo_count": 16756,
+    "simulate_time_seconds": 137.56,
+    "simulation_duration_days": 30
+  },
+  "summary": {
+    "failed_driver_count": 0,
+    "failed_drivers": {},
+    "total_net_income_all_drivers": 163972.58,
+    "total_preference_penalty": 90560.0,
+    "total_token_usage": {
+      "completion_tokens": 0,
+      "prompt_tokens": 0,
+      "reasoning_tokens": 0,
+      "total_tokens": 0
+    }
+  }
+}
