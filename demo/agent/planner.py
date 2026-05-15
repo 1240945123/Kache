@@ -201,6 +201,36 @@ def _visited_target(state: PlannerState, latitude: float, longitude: float, radi
     return False
 
 
+def _wait_credit_near_target_before(
+    state: PlannerState,
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+    before_minute: int,
+) -> int:
+    credit = 0
+    for record in reversed(state.history_records):
+        if _action_name(record) != "wait":
+            break
+        end_minute = _minute_from_simulation_end_time(record.get("simulation_end_time"))
+        if end_minute is None:
+            end_minute = state.current_minute
+        if end_minute > before_minute:
+            continue
+        position = record.get("position_after")
+        if not isinstance(position, dict):
+            break
+        try:
+            position_lat = float(position["lat"])
+            position_lng = float(position["lng"])
+        except (KeyError, TypeError, ValueError):
+            break
+        if haversine_km(position_lat, position_lng, latitude, longitude) > radius_km:
+            break
+        credit += _wait_minutes_from_record(record)
+    return credit
+
+
 def _sequence_task_intent(state: PlannerState, rule: PreferenceRule) -> PlannedIntent | None:
     try:
         steps = rule.value["steps"]
@@ -209,6 +239,7 @@ def _sequence_task_intent(state: PlannerState, rule: PreferenceRule) -> PlannedI
         pickup_lat = float(pickup_step["lat"])
         pickup_lng = float(pickup_step["lng"])
         pickup_wait = int(pickup_step.get("wait_minutes", 10))
+        pickup_radius_km = float(pickup_step.get("radius_km", 1.0))
         home_lat = float(home_step["lat"])
         home_lng = float(home_step["lng"])
         deadline_minute = _minute_from_wall_time(rule.value["deadline"])
@@ -238,12 +269,19 @@ def _sequence_task_intent(state: PlannerState, rule: PreferenceRule) -> PlannedI
             metadata={"rule_type": rule.rule_type.value},
         )
 
-    if not _visited_target(state, pickup_lat, pickup_lng, 1.0, before_minute=deadline_minute):
-        if haversine_km(state.current_lat, state.current_lng, pickup_lat, pickup_lng) <= 1.0:
+    pickup_dwell_credit = _wait_credit_near_target_before(
+        state,
+        pickup_lat,
+        pickup_lng,
+        pickup_radius_km,
+        deadline_minute,
+    )
+    if pickup_dwell_credit < pickup_wait:
+        if haversine_km(state.current_lat, state.current_lng, pickup_lat, pickup_lng) <= pickup_radius_km:
             return PlannedIntent(
                 intent_type="sequence_pickup_wait",
                 action="wait",
-                params={"duration_minutes": max(1, pickup_wait)},
+                params={"duration_minutes": max(1, pickup_wait - pickup_dwell_credit)},
                 reason=rule.source_text,
                 priority=120,
                 metadata={"rule_type": rule.rule_type.value},
