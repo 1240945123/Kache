@@ -16,7 +16,6 @@ if __package__:
     from .scoring import score_candidates
     from .strategy_helpers import Candidate
     from .strategy_helpers import fallback_wait_action, filter_and_rank_candidates
-    from .strategy_helpers import haversine_km, movement_minutes
 else:
     from planner import build_planner_state, choose_required_intent
     from policy_guard import filter_candidates, should_wait_for_window
@@ -25,7 +24,6 @@ else:
     from scoring import score_candidates
     from strategy_helpers import Candidate
     from strategy_helpers import fallback_wait_action, filter_and_rank_candidates
-    from strategy_helpers import haversine_km, movement_minutes
 
 UNENFORCED_HARD_RULE_TYPES = {
     RuleType.BOUNDING_BOX,
@@ -102,7 +100,6 @@ class ModelDecisionService:
                 history = self._safe_history(driver_id, -1)
             allowed_candidates = self._apply_monthly_deadhead_limit(allowed_candidates, rules, history)
         allowed_candidates = self._apply_required_cargo(allowed_candidates, required_cargo_ids)
-        allowed_candidates = self._apply_hard_future_window_feasibility(allowed_candidates, rules, status)
         if not allowed_candidates and required_cargo_ids:
             action = fallback_wait_action()
             self._logger.info("decision required_cargo_missing driver_id=%s action=%s", driver_id, action)
@@ -223,50 +220,6 @@ class ModelDecisionService:
             return candidates
         remaining_km = min(limits) - self._monthly_deadhead_used_km(history)
         return [candidate for candidate in candidates if candidate.pickup_distance_km <= remaining_km]
-
-    def _apply_hard_future_window_feasibility(
-        self,
-        candidates: list[Candidate],
-        rules: list[PreferenceRule],
-        status: dict[str, Any],
-    ) -> list[Candidate]:
-        return [
-            candidate
-            for candidate in candidates
-            if self._candidate_preserves_home_deadline(candidate, rules, status)
-        ]
-
-    def _candidate_preserves_home_deadline(
-        self,
-        candidate: Candidate,
-        rules: list[PreferenceRule],
-        status: dict[str, Any],
-    ) -> bool:
-        current_minute = int(status.get("simulation_progress_minutes", 0) or 0)
-        current_day_start = (current_minute // 1440) * 1440
-        for rule in rules:
-            if rule.strength != RuleStrength.HARD or rule.rule_type != RuleType.HOME_DEADLINE:
-                continue
-            try:
-                deadline_minute = int(rule.value["deadline_minute"])
-                home_lat = float(rule.value["lat"])
-                home_lng = float(rule.value["lng"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            deadline_abs = current_day_start + deadline_minute
-            if current_minute > deadline_abs:
-                deadline_abs += 1440
-            if candidate.estimated_finish_minute > deadline_abs:
-                return False
-            try:
-                unload_lat = float(candidate.end["lat"])
-                unload_lng = float(candidate.end["lng"])
-            except (KeyError, TypeError, ValueError):
-                return False
-            return_home_minutes = movement_minutes(haversine_km(unload_lat, unload_lng, home_lat, home_lng))
-            if candidate.estimated_finish_minute + return_home_minutes > deadline_abs:
-                return False
-        return True
 
     def _model_parse_preference(self, text: str) -> dict[str, Any]:
         payload = {

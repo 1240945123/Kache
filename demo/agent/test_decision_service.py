@@ -231,35 +231,6 @@ class DecisionServiceTest(unittest.TestCase):
         self.assertEqual(api.model_count, 0)
         self.assertEqual(api.query_count, 0)
 
-    def test_candidate_that_makes_home_deadline_impossible_is_filtered(self):
-        api = FakeApi(
-            status=_status(
-                current_lat=23.12,
-                current_lng=113.28,
-                simulation_progress_minutes=22 * 60,
-                preferences=["每天23点前车辆须在自家位置（23.12，113.28）一公里内。"],
-            ),
-            cargo_items=[
-                {
-                    "distance_km": 1.0,
-                    "cargo": {
-                        "cargo_id": "LATE",
-                        "category": "普通货物",
-                        "remove_time": "2026-03-01 22:30:00",
-                        "price": 10000.0,
-                        "cost_time_minutes": 30,
-                        "load_time": None,
-                        "start": {"lat": 23.12, "lng": 113.28},
-                        "end": {"lat": 24.5, "lng": 115.0},
-                    },
-                }
-            ],
-        )
-
-        action = ModelDecisionService(api).decide("DXXX")
-
-        self.assertEqual(action["action"], "wait")
-
 
 if __name__ == "__main__":
     unittest.main()
