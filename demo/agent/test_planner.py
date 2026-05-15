@@ -405,6 +405,65 @@ class PlannerTest(unittest.TestCase):
         self.assertEqual(intent.action, "reposition")
         self.assertEqual(intent.params, {"latitude": 23.19, "longitude": 113.36})
 
+    def test_sequence_task_remembers_pickup_dwell_after_returning_home(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 9 * 24 * 60 + 16 * 60 + 16,
+                "current_lat": 23.19,
+                "current_lng": 113.36,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "wait", "params": {"duration_minutes": 10}},
+                        "position_after": {"lat": 23.21, "lng": 113.37},
+                        "simulation_end_time": "2026-03-10 16:10",
+                        "step_elapsed_minutes": 10,
+                    },
+                    {
+                        "action": {"action": "reposition", "params": {"latitude": 23.19, "longitude": 113.36}},
+                        "position_after": {"lat": 23.19, "lng": 113.36},
+                        "simulation_end_time": "2026-03-10 16:16",
+                        "step_elapsed_minutes": 6,
+                    },
+                ]
+            },
+        )
+
+        intent = choose_required_intent(state, [self._sequence_rule()])
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "sequence_stay_home")
+        self.assertEqual(intent.action, "wait")
+
+    def test_sequence_task_stays_home_until_stay_until_after_pickup_dwell(self):
+        state = build_planner_state(
+            {
+                "simulation_progress_minutes": 9 * 24 * 60 + 16 * 60 + 10,
+                "current_lat": 23.19,
+                "current_lng": 113.36,
+                "completed_order_count": 0,
+            },
+            {
+                "records": [
+                    {
+                        "action": {"action": "wait", "params": {"duration_minutes": 10}},
+                        "position_after": {"lat": 23.21, "lng": 113.37},
+                        "simulation_end_time": "2026-03-10 16:10",
+                        "step_elapsed_minutes": 10,
+                    }
+                ]
+            },
+        )
+
+        intent = choose_required_intent(state, [self._sequence_rule()])
+
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.intent_type, "sequence_stay_home")
+        self.assertEqual(intent.action, "wait")
+        self.assertEqual(intent.params, {"duration_minutes": (12 * 24 * 60 + 22 * 60) - state.current_minute})
+
     def test_current_day_rest_credit_clips_wait_that_crossed_midnight(self):
         state = build_planner_state(
             {

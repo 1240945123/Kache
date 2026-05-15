@@ -211,7 +211,7 @@ def _wait_credit_near_target_before(
     credit = 0
     for record in reversed(state.history_records):
         if _action_name(record) != "wait":
-            break
+            continue
         end_minute = _minute_from_simulation_end_time(record.get("simulation_end_time"))
         if end_minute is None:
             end_minute = state.current_minute
@@ -219,14 +219,14 @@ def _wait_credit_near_target_before(
             continue
         position = record.get("position_after")
         if not isinstance(position, dict):
-            break
+            continue
         try:
             position_lat = float(position["lat"])
             position_lng = float(position["lng"])
         except (KeyError, TypeError, ValueError):
-            break
+            continue
         if haversine_km(position_lat, position_lng, latitude, longitude) > radius_km:
-            break
+            continue
         credit += _wait_minutes_from_record(record)
     return credit
 
@@ -305,9 +305,9 @@ def _sequence_task_intent(state: PlannerState, rule: PreferenceRule) -> PlannedI
             metadata={"rule_type": rule.rule_type.value},
         )
     return PlannedIntent(
-        intent_type="sequence_wait_deadline",
+        intent_type="sequence_stay_home",
         action="wait",
-        params={"duration_minutes": max(1, deadline_minute - state.current_minute)},
+        params={"duration_minutes": max(1, stay_until_minute - state.current_minute)},
         reason=rule.source_text,
         priority=120,
         metadata={"rule_type": rule.rule_type.value},
