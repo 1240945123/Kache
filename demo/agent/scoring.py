@@ -4,15 +4,18 @@ from dataclasses import dataclass
 from typing import Any
 
 if __package__:
+    from .market_heatmap import MarketHeatmap
     from .preference_rules import PreferenceRule, RuleStrength, RuleType
     from .strategy_helpers import Candidate
 else:
+    from market_heatmap import MarketHeatmap
     from preference_rules import PreferenceRule, RuleStrength, RuleType
     from strategy_helpers import Candidate
 
 SOFT_CATEGORY_PENALTY = 80.0
 VALUE_PER_MINUTE_BONUS_FACTOR = 1.0
 PICKUP_DISTANCE_PENALTY_FACTOR = 0.5
+FUTURE_MARKET_BONUS_FACTOR = 1.0
 CARGO_CATEGORY_KEYS = ("category", "cargo_name", "cargo_type", "goods_type")
 
 
@@ -36,6 +39,7 @@ def score_candidate(
     rules: list[PreferenceRule],
     *,
     cargo_by_id: dict[str, dict[str, Any]],
+    market_heatmap: MarketHeatmap | None = None,
 ) -> ScoredCandidate:
     score = (
         candidate.rough_net_value
@@ -47,6 +51,19 @@ def score_candidate(
         f"value per minute bonus {candidate.value_per_minute * VALUE_PER_MINUTE_BONUS_FACTOR:.2f}",
         f"pickup distance penalty {candidate.pickup_distance_km * PICKUP_DISTANCE_PENALTY_FACTOR:.2f}",
     ]
+
+    if market_heatmap is not None:
+        try:
+            future_bonus = market_heatmap.future_value(
+                float(candidate.end["lat"]),
+                float(candidate.end["lng"]),
+                current_minute=candidate.estimated_finish_minute,
+            ) * FUTURE_MARKET_BONUS_FACTOR
+        except (KeyError, TypeError, ValueError):
+            future_bonus = 0.0
+        if future_bonus > 0:
+            score += future_bonus
+            reasons.append(f"future market bonus {future_bonus:.2f}")
 
     for rule in rules:
         if rule.strength != RuleStrength.SOFT or rule.rule_type != RuleType.CARGO_CATEGORY:
@@ -63,8 +80,12 @@ def score_candidates(
     rules: list[PreferenceRule],
     *,
     cargo_by_id: dict[str, dict[str, Any]],
+    market_heatmap: MarketHeatmap | None = None,
 ) -> list[ScoredCandidate]:
-    scored = [score_candidate(candidate, rules, cargo_by_id=cargo_by_id) for candidate in candidates]
+    scored = [
+        score_candidate(candidate, rules, cargo_by_id=cargo_by_id, market_heatmap=market_heatmap)
+        for candidate in candidates
+    ]
     scored.sort(
         key=lambda item: (
             -item.score,

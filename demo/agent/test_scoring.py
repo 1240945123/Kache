@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from preference_rules import PreferenceRule, RuleStrength, RuleType
+from market_heatmap import MarketHeatmap
 from scoring import score_candidates
 from strategy_helpers import Candidate
 
@@ -61,6 +62,38 @@ class ScoringTest(unittest.TestCase):
 
         self.assertEqual([item.candidate.cargo_id for item in scored], ["B", "A"])
         self.assertTrue(any("soft cargo category" in reason for reason in scored[1].reasons))
+
+    def test_future_market_bonus_can_raise_candidate_ending_near_future_cargo(self):
+        isolated = _candidate(
+            cargo_id="ISOLATED",
+            rough_net_value=300.0,
+            value_per_minute=1.0,
+            end={"lat": 25.0, "lng": 115.0},
+            estimated_finish_minute=100,
+        )
+        connected = _candidate(
+            cargo_id="CONNECTED",
+            rough_net_value=260.0,
+            value_per_minute=1.0,
+            end={"lat": 23.0, "lng": 113.0},
+            estimated_finish_minute=100,
+        )
+        heatmap = MarketHeatmap.from_cargo_records(
+            [
+                {
+                    "cargo_id": f"FUTURE{i}",
+                    "create_minute": 120 + i,
+                    "price": 1000.0,
+                    "start": {"lat": 23.01, "lng": 113.01},
+                }
+                for i in range(12)
+            ]
+        )
+
+        scored = score_candidates([isolated, connected], [], cargo_by_id={}, market_heatmap=heatmap)
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["CONNECTED", "ISOLATED"])
+        self.assertTrue(any("future market bonus" in reason for reason in scored[0].reasons))
 
 
 if __name__ == "__main__":

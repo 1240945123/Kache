@@ -9,6 +9,7 @@ from typing import Any
 from simkit.ports import SimulationApiPort
 
 if __package__:
+    from .market_heatmap import load_default_market_heatmap
     from .planner import build_planner_state, choose_required_intent
     from .policy_guard import filter_candidates, should_wait_for_window
     from .preference_parser import parse_preferences, parse_preferences_with_fallback
@@ -17,6 +18,7 @@ if __package__:
     from .strategy_helpers import Candidate
     from .strategy_helpers import fallback_wait_action, filter_and_rank_candidates
 else:
+    from market_heatmap import load_default_market_heatmap
     from planner import build_planner_state, choose_required_intent
     from policy_guard import filter_candidates, should_wait_for_window
     from preference_parser import parse_preferences, parse_preferences_with_fallback
@@ -109,7 +111,12 @@ class ModelDecisionService:
             action = fallback_wait_action()
             self._logger.info("decision required_cargo_missing driver_id=%s action=%s", driver_id, action)
             return action
-        scored_candidates = score_candidates(allowed_candidates, rules, cargo_by_id=cargo_by_id)
+        scored_candidates = score_candidates(
+            allowed_candidates,
+            rules,
+            cargo_by_id=cargo_by_id,
+            market_heatmap=load_default_market_heatmap(),
+        )
 
         if scored_candidates:
             chosen = scored_candidates[0].candidate
