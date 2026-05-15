@@ -95,6 +95,79 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual([item.candidate.cargo_id for item in scored], ["CONNECTED", "ISOLATED"])
         self.assertTrue(any("future market bonus" in reason for reason in scored[0].reasons))
 
+    def test_hard_no_drive_window_risk_can_lower_crossing_candidate(self):
+        crossing = _candidate(
+            cargo_id="CROSS",
+            rough_net_value=330.0,
+            value_per_minute=1.0,
+            pickup_minutes=20,
+            wait_minutes=0,
+            cost_time_minutes=70,
+            estimated_finish_minute=24 * 60 + 30,
+        )
+        safe = _candidate(
+            cargo_id="SAFE",
+            rough_net_value=260.0,
+            value_per_minute=1.0,
+            pickup_minutes=15,
+            wait_minutes=0,
+            cost_time_minutes=45,
+            estimated_finish_minute=22 * 60 + 30,
+        )
+        rules = [
+            PreferenceRule(
+                RuleType.NO_DRIVE_WINDOW,
+                RuleStrength.HARD,
+                {"start_minute": 23 * 60, "end_minute": 6 * 60, "cross_day": True},
+                "night window",
+            )
+        ]
+
+        scored = score_candidates([crossing, safe], rules, cargo_by_id={})
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["SAFE", "CROSS"])
+        self.assertTrue(any("no-drive window risk" in reason for reason in scored[1].reasons))
+
+    def test_sequence_deadline_risk_can_lower_late_candidate(self):
+        risky = _candidate(
+            cargo_id="RISKY",
+            rough_net_value=330.0,
+            value_per_minute=1.0,
+            pickup_minutes=30,
+            wait_minutes=0,
+            cost_time_minutes=210,
+            estimated_finish_minute=9 * 24 * 60 + 18 * 60,
+        )
+        safe = _candidate(
+            cargo_id="SAFE",
+            rough_net_value=260.0,
+            value_per_minute=1.0,
+            pickup_minutes=10,
+            wait_minutes=0,
+            cost_time_minutes=60,
+            estimated_finish_minute=9 * 24 * 60 + 12 * 60,
+        )
+        rules = [
+            PreferenceRule(
+                RuleType.SEQUENCE_TASK,
+                RuleStrength.HARD,
+                {
+                    "steps": [
+                        {"action": "pickup", "lat": 23.21, "lng": 113.37, "wait_minutes": 10},
+                        {"action": "return_home", "lat": 23.19, "lng": 113.36},
+                    ],
+                    "deadline": "2026-03-10 22:00:00",
+                    "stay_until": "2026-03-13 22:00:00",
+                },
+                "sequence task",
+            )
+        ]
+
+        scored = score_candidates([risky, safe], rules, cargo_by_id={})
+
+        self.assertEqual([item.candidate.cargo_id for item in scored], ["SAFE", "RISKY"])
+        self.assertTrue(any("sequence deadline risk" in reason for reason in scored[1].reasons))
+
 
 if __name__ == "__main__":
     unittest.main()
